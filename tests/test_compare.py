@@ -229,3 +229,14 @@ def test_fishing_index_official_value_and_too_far(client, fishing_setup):
     fb = b["fishing_index"]
     assert fb["status"] == "unavailable" and fb["reason"] == "TOO_FAR"
     assert fb["source"]["distance_km"] == 25.0 and fb["periods"] is None
+
+
+def test_place_conditions(client, setup):
+    r = client.get(f"/api/v1/places/{setup['a']}/conditions", params={"date": str(setup["today"])})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["place"]["place"]["name"] == "비교 A"
+    assert any(s["metric"] == "tide_extreme" and s["status"] == "ok" for s in body["place"]["series"])
+    assert (
+        client.get("/api/v1/places/99999/conditions", params={"date": str(setup["today"])}).status_code == 400
+    )

@@ -35,6 +35,7 @@ from app.schemas.compare import (
     FishingPeriodOut,
     FishingSpeciesOut,
     PlaceCompareOut,
+    PlaceConditionsOut,
     PointOut,
     SeriesOut,
     SourceOut,
@@ -66,30 +67,43 @@ def date_range() -> DateRangeOut:
     )
 
 
-def compare(db: Session, place_a: int, place_b: int, day: date) -> CompareOut:
-    if place_a == place_b:
-        raise HTTPException(status_code=400, detail="서로 다른 두 장소를 선택해 주세요")
+def _check_day(day: date) -> None:
     rng = date_range()
     if not (rng.min <= day <= rng.max):
         raise HTTPException(status_code=400, detail=f"조회 가능한 날짜는 {rng.min} ~ {rng.max} 입니다")
 
-    places = []
-    for pid in (place_a, place_b):
-        p = db.scalar(
-            select(Place)
-            .where(Place.id == pid, Place.is_active.is_(True))
-            .options(
-                selectinload(Place.region), selectinload(Place.stations).selectinload(PlaceStation.station)
-            )
-        )
-        if p is None:
-            raise HTTPException(status_code=400, detail="지원하지 않는 장소입니다")
-        places.append(p)
 
+def _load_place(db: Session, place_id: int) -> Place:
+    p = db.scalar(
+        select(Place)
+        .where(Place.id == place_id, Place.is_active.is_(True))
+        .options(selectinload(Place.region), selectinload(Place.stations).selectinload(PlaceStation.station))
+    )
+    if p is None:
+        raise HTTPException(status_code=400, detail="지원하지 않는 장소입니다")
+    return p
+
+
+def compare(db: Session, place_a: int, place_b: int, day: date) -> CompareOut:
+    if place_a == place_b:
+        raise HTTPException(status_code=400, detail="서로 다른 두 장소를 선택해 주세요")
+    _check_day(day)
+    places = [_load_place(db, pid) for pid in (place_a, place_b)]
     return CompareOut(
         date=day,
         generated_at=utcnow(),
         places=[_place_compare(db, p, day) for p in places],
+        disclaimer=DISCLAIMER,
+    )
+
+
+def conditions(db: Session, place_id: int, day: date) -> PlaceConditionsOut:
+    """장소 1곳의 환경조건 (홈 화면 요약용). 비교와 같은 규칙으로 계열을 만든다"""
+    _check_day(day)
+    return PlaceConditionsOut(
+        date=day,
+        generated_at=utcnow(),
+        place=_place_compare(db, _load_place(db, place_id), day),
         disclaimer=DISCLAIMER,
     )
 

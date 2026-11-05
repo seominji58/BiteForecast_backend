@@ -107,6 +107,14 @@ class CompareOut(BaseModel):
     disclaimer: str
 
 
+class PlaceConditionsOut(BaseModel):
+    date: date
+    timezone: str = "Asia/Seoul"
+    generated_at: datetime
+    place: PlaceCompareOut
+    disclaimer: str
+
+
 class DateRangeOut(BaseModel):
     today: date
     min: date
