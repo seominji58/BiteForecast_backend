@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # 바다낚시지수 지점이 이보다 멀면 「가까운 지수 지점 없음」으로 표시
     fishing_index_max_km: float = 10
 
+    # 커뮤니티: 신고 몇 회면 자동 숨김 / 좋아요 몇 개부터 인기글 표시
+    community_hide_reports: int = 3
+    community_popular_likes: int = 10
+
 
 @lru_cache
 def get_settings() -> Settings:
