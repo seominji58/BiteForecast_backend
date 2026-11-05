@@ -240,3 +240,48 @@ def test_place_conditions(client, setup):
     assert (
         client.get("/api/v1/places/99999/conditions", params={"date": str(setup["today"])}).status_code == 400
     )
+
+
+def test_fishing_index_refetches_when_new_station_mapped(client):
+    """일부 지점만 받아둔 상태면 6시간 안이라도 다시 받는다 (새로 연결된 지점 누락 방지)"""
+    from datetime import date
+
+    from app.clients.khoa import FishingIndexRow
+    from app.jobs.collect import _collect_fishing_index
+    from app.models import FishingIndex
+
+    today = today_kst()
+    with SessionLocal() as db:
+        old = Station(
+            provider="KHOA", external_id="기존지점", name="기존지점", kind=StationKind.FISHING_INDEX
+        )
+        new = Station(provider="KHOA", external_id="새지점", name="새지점", kind=StationKind.FISHING_INDEX)
+        db.add_all([old, new])
+        db.flush()
+        db.add(
+            FishingIndex(
+                station_id=old.id, day=today, period="오전", species="우럭", index="좋음", fetched_at=utcnow()
+            )
+        )
+        db.commit()
+
+        class FakeClient:
+            calls = 0
+
+            def fishing_index(self, day: date):
+                FakeClient.calls += 1
+                return [
+                    FishingIndexRow(
+                        p, today, "오전", "우럭", "보통", None, None, None, None, None, None, None
+                    )
+                    for p in ("기존지점", "새지점")
+                ]
+
+        from collections import Counter
+
+        stats = Counter()
+        _collect_fishing_index(db, FakeClient(), today, [old, new], stats)
+        db.commit()
+        assert FakeClient.calls == 1
+        _collect_fishing_index(db, FakeClient(), today, [old, new], stats)  # 이제 모두 있음 → 건너뜀
+        assert FakeClient.calls == 1 and stats["fishing_index_skipped"] == 1

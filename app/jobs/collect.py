@@ -263,9 +263,16 @@ def _collect_fishing_index(db, client, today: date, stations: list[Station], sta
     """국립해양조사원 바다낚시지수. 한 번 호출로 전국 지점이 오므로 매핑된 지점만 골라 저장한다"""
     if not stations:
         return
-    last = db.scalar(select(func.max(FishingIndex.fetched_at)))
-    if last is not None and utcnow() - last < timedelta(hours=6):
-        stats["fishing_index_skipped"] += 1  # 하루 2회(오전·오후) 갱신이면 충분
+    # 연결된 모든 지점에 오늘 자료가 있고 6시간 안에 받았으면 건너뜀 (새로 연결된 지점이 있으면 다시 받음)
+    covered = set(
+        db.scalars(
+            select(FishingIndex.station_id).where(
+                FishingIndex.day == today, FishingIndex.fetched_at >= utcnow() - timedelta(hours=6)
+            )
+        ).all()
+    )
+    if all(st.id in covered for st in stations):
+        stats["fishing_index_skipped"] += 1
         return
     try:
         rows = client.fishing_index(today)
