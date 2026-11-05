@@ -1,8 +1,10 @@
+import logging
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, inspect, select, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy.schema import CreateColumn
 
 from app.core.config import get_settings
 from app.models import Base, Species, Title
@@ -68,9 +70,43 @@ DEFAULT_SPECIES = [
 ]
 
 
+def _add_missing_columns() -> list[str]:
+    """기존 테이블에 새로 생긴 컬럼만 추가한다 (데이터는 그대로).
+
+    create_all 은 기존 테이블을 바꾸지 않으므로 필요하다.
+
+    추가만 하고 삭제·형 변경은 하지 않는다. 새 컬럼은 NULL 허용이거나 server_default 가 있어야 한다.
+    운영 DB 로 옮길 때는 Alembic 마이그레이션으로 대체한다.
+    """
+    added: list[str] = []
+    insp = inspect(engine)
+    existing_tables = set(insp.get_table_names())
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if table.name not in existing_tables:
+                continue
+            have = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in have:
+                    continue
+                if not col.nullable and col.server_default is None:
+                    raise RuntimeError(
+                        f"{table.name}.{col.name}: NOT NULL 컬럼은 server_default 가 있어야 추가 가능"
+                    )
+                ddl = (
+                    f"ALTER TABLE {table.name} ADD COLUMN {CreateColumn(col).compile(dialect=engine.dialect)}"
+                )
+                conn.execute(text(ddl))
+                added.append(f"{table.name}.{col.name}")
+    return added
+
+
 def init_db() -> None:
-    """개발용: 테이블 생성 + 기준 데이터 시드. 스키마가 안정되면 Alembic 마이그레이션으로 전환."""
+    """개발용: 테이블 생성 + 새 컬럼 추가 + 기준 데이터 시드."""
     Base.metadata.create_all(engine)
+    added = _add_missing_columns()
+    if added:
+        logging.getLogger(__name__).info("컬럼 추가: %s", ", ".join(added))
     with SessionLocal() as db:
         if db.scalar(select(Title.id).limit(1)) is None:
             db.add_all(

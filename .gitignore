@@ -8,3 +8,5 @@ __pycache__/
 *.sqlite3
 uploads/
 .DS_Store
+backups/
+media/

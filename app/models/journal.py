@@ -4,7 +4,7 @@ from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UTCDateTime, str_enum, utcnow
-from app.models.enums import DataKind, Metric
+from app.models.enums import DataKind, Metric, VerificationStatus
 
 
 class Journal(TimestampMixin, Base):
@@ -26,26 +26,25 @@ class Journal(TimestampMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
+    # 사진 인증 (재설계 v2 §9). 포인트는 approved 일지에서만 계산된다
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        str_enum(VerificationStatus),
+        default=VerificationStatus.NONE,
+        server_default=VerificationStatus.NONE.value,
+    )
+    verification_requested_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    verification_reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    verification_reject_reason: Mapped[str | None] = mapped_column(String(200))
+
     place: Mapped["Place"] = relationship()  # noqa: F821
-    photos: Mapped[list["JournalPhoto"]] = relationship(back_populates="journal")
+    photos: Mapped[list["Photo"]] = relationship(  # noqa: F821
+        primaryjoin="and_(Journal.id == foreign(Photo.journal_id), Photo.deleted_at.is_(None))",
+        order_by="Photo.sort_order, Photo.id",
+        viewonly=True,
+    )
     env_snapshots: Mapped[list["JournalEnvSnapshot"]] = relationship(
         back_populates="journal", cascade="all, delete-orphan"
     )
-
-
-class JournalPhoto(TimestampMixin, Base):
-    """사진 (FR-09). EXIF 제거 후 저장, 기본 비공개"""
-
-    __tablename__ = "journal_photo"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    journal_id: Mapped[int] = mapped_column(ForeignKey("journal.id", ondelete="CASCADE"), index=True)
-    path: Mapped[str] = mapped_column(String(255))
-    width: Mapped[int | None] = mapped_column(Integer)
-    height: Mapped[int | None] = mapped_column(Integer)
-    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
-
-    journal: Mapped[Journal] = relationship(back_populates="photos")
 
 
 class JournalEnvSnapshot(Base):

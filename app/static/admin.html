@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>입질예보 · 사진 인증 검토</title>
+<style>
+  :root { --navy:#0f2a47; --orange:#ee8526; --teal:#0f6e6e; --line:#d8dee6; --muted:#5b6672; --danger:#c62828; --warn:#a15c00; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; background:#eef2f6; color:#16202b; }
+  header { background:var(--navy); color:#fff; padding:12px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; flex:1; }
+  main { max-width:960px; margin:0 auto; padding:16px; display:grid; gap:12px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; display:grid; gap:8px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .muted { color:var(--muted); font-size:12px; }
+  .photos { display:flex; gap:8px; flex-wrap:wrap; }
+  .photos figure { margin:0; width:200px; }
+  .photos img { width:200px; height:200px; object-fit:cover; border-radius:8px; border:1px solid var(--line); background:#f3f6f9; cursor:zoom-in; }
+  .flag { color:var(--warn); font-weight:700; }
+  .ok { color:var(--teal); }
+  button { font:inherit; border-radius:8px; padding:8px 14px; border:1.5px solid var(--teal); background:#fff; color:var(--teal); font-weight:700; cursor:pointer; }
+  button.primary { background:var(--orange); border-color:var(--orange); color:#fff; }
+  button.danger { border-color:var(--danger); color:var(--danger); }
+  button[aria-pressed=true] { background:var(--teal); color:#fff; }
+  input { font:inherit; padding:8px; border:1px solid var(--line); border-radius:8px; min-width:0; }
+  .reason { flex:1; min-width:200px; }
+  .status { font-weight:700; }
+  #msg { min-height:20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>입질예보 · 사진 인증 검토</h1>
+  <input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="off">
+  <button id="save">연결</button>
+</header>
+<main>
+  <div class="row" role="tablist">
+    <button data-status="pending" aria-pressed="true">검토 대기</button>
+    <button data-status="approved" aria-pressed="false">승인</button>
+    <button data-status="rejected" aria-pressed="false">반려</button>
+  </div>
+  <p class="muted">사전 검사(촬영 시각 차이·같은 사진 재사용)는 참고 정보입니다. EXIF 가 없다는 이유만으로 반려하지 마세요. 승인 시에만 포인트가 지급되며, 같은 기록은 몇 번 승인해도 한 번만 반영됩니다.</p>
+  <div id="msg" class="muted" role="status"></div>
+  <div id="list"></div>
+</main>
+<script>
+const API = location.pathname.replace(/\/admin\/?$/, '');
+let status = 'pending';
+const $ = (s) => document.querySelector(s);
+const tokenInput = $('#token');
+tokenInput.value = sessionStorage.getItem('bf_admin_token') || '';
+const headers = () => ({ 'X-Admin-Token': tokenInput.value });
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = (iso) => iso ? new Date(iso).toLocaleString('ko-KR', { dateStyle:'medium', timeStyle:'short' }) : '-';
+const LABEL = { pending:'검토 대기', approved:'승인', rejected:'반려' };
+
+async function call(path, opts = {}) {
+  const res = await fetch(API + path, { ...opts, headers: { ...headers(), ...(opts.body ? { 'Content-Type':'application/json' } : {}) } });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error?.message || res.status);
+  return data;
+}
+
+async function loadImg(img, url) {
+  try {
+    const res = await fetch(API + url, { headers: headers() });
+    if (!res.ok) throw new Error();
+    img.src = URL.createObjectURL(await res.blob());
+    img.onclick = () => window.open(img.src);
+  } catch { img.alt = '사진을 불러오지 못했습니다'; }
+}
+
+function render(items) {
+  const list = $('#list');
+  list.innerHTML = items.length ? '' : '<div class="card muted">항목이 없습니다.</div>';
+  for (const it of items) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const pre = Object.fromEntries(it.precheck.map((p) => [p.photo_id, p]));
+    card.innerHTML = `
+      <div class="row"><span class="status">#${it.journal_id} · ${LABEL[it.status]}</span><span class="muted">${esc(it.author)} · 신청 ${fmt(it.requested_at)}${it.reviewed_at ? ' · 검토 ' + fmt(it.reviewed_at) : ''}</span></div>
+      <div><b>${esc(it.place_name)}</b> · 출조 ${fmt(it.fished_at)}</div>
+      <div>어종 <b>${esc(it.species_name || '-')}</b> · 마릿수 ${it.count ?? '-'} · 최대 길이 ${it.max_length_cm != null ? it.max_length_cm + 'cm' : '-'}</div>
+      ${it.memo ? `<div class="muted">메모: ${esc(it.memo)}</div>` : ''}
+      ${it.reject_reason ? `<div class="flag">반려 사유: ${esc(it.reject_reason)}</div>` : ''}
+      <div class="photos">${it.photos.map((p) => {
+        const c = pre[p.id] || {};
+        const dup = c.duplicate_journal_ids?.length ? `<div class="flag">같은 사진이 기록 #${c.duplicate_journal_ids.join(', #')}에도 있음${c.duplicate_other_user ? ' (다른 사용자)' : ''}</div>` : '<div class="ok muted">다른 기록과 겹치는 사진 없음</div>';
+        return `<figure><img data-url="${esc(p.url)}" alt="인증 사진 ${p.id}"><figcaption class="muted"><div class="${c.time_flag ? 'flag' : ''}">${esc(c.time_note)}</div>${dup}</figcaption></figure>`;
+      }).join('')}</div>
+      ${it.status !== 'rejected' ? `<div class="row">
+        ${it.status === 'pending' ? '<button class="primary" data-act="approve">승인 (포인트 지급)</button>' : ''}
+        <input class="reason" maxlength="200" placeholder="반려 사유 (사용자에게 표시됩니다)">
+        <button class="danger" data-act="reject">반려</button>
+      </div>` : ''}`;
+    card.querySelectorAll('img[data-url]').forEach((img) => loadImg(img, img.dataset.url));
+    card.querySelector('[data-act=approve]')?.addEventListener('click', () => act(it.journal_id, 'approve'));
+    card.querySelector('[data-act=reject]')?.addEventListener('click', () => {
+      const reason = card.querySelector('.reason').value.trim();
+      if (reason.length < 2) { $('#msg').textContent = '반려 사유를 2자 이상 입력하세요.'; return; }
+      act(it.journal_id, 'reject', { reason });
+    });
+    list.appendChild(card);
+  }
+}
+
+async function act(id, kind, body) {
+  try {
+    await call(`/admin/verifications/${id}/${kind}`, { method:'POST', body: body ? JSON.stringify(body) : undefined });
+    $('#msg').textContent = `#${id} ${kind === 'approve' ? '승인' : '반려'} 완료`;
+    load();
+  } catch (e) { $('#msg').textContent = '실패: ' + e.message; }
+}
+
+async function load() {
+  try { render(await call(`/admin/verifications?status=${status}`)); }
+  catch (e) { $('#list').innerHTML = ''; $('#msg').textContent = '불러오지 못했습니다: ' + e.message; }
+}
+
+$('#save').onclick = () => { sessionStorage.setItem('bf_admin_token', tokenInput.value); $('#msg').textContent = ''; load(); };
+document.querySelectorAll('[data-status]').forEach((b) => b.onclick = () => {
+  status = b.dataset.status;
+  document.querySelectorAll('[data-status]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  load();
+});
+if (tokenInput.value) load();
+</script>
+</body>
+</html>

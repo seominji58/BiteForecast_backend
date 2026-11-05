@@ -30,3 +30,15 @@ def update_journal(journal_id: int, data: JournalIn, user: CurrentUser, db: DbSe
 @router.delete("/{journal_id}", response_model=JournalMutationOut)
 def delete_journal(journal_id: int, user: CurrentUser, db: DbSession):
     return svc.delete_journal(db, user, journal_id)
+
+
+@router.post("/{journal_id}/verification", response_model=JournalOut)
+def request_verification(journal_id: int, user: CurrentUser, db: DbSession):
+    """사진 인증 신청 (사진 1장 이상·어종 필요). 포인트는 관리자 승인 후에만 지급"""
+    return svc.request_verification(db, user, journal_id)
+
+
+@router.delete("/{journal_id}/verification", response_model=JournalOut)
+def cancel_verification(journal_id: int, user: CurrentUser, db: DbSession):
+    """검토 대기 중인 인증 신청 취소"""
+    return svc.cancel_verification(db, user, journal_id)

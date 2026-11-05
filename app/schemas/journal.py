@@ -2,9 +2,10 @@ from datetime import UTC, datetime, timedelta
 
 from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
 
-from app.models.enums import DataKind, Metric, PointReason
+from app.models.enums import DataKind, Metric, PointReason, VerificationStatus
 from app.schemas.common import ORMModel
 from app.schemas.me import MyTitleOut
+from app.schemas.photo import PhotoOut
 
 # 기기 시계 오차 허용
 _FUTURE_TOLERANCE = timedelta(minutes=5)
@@ -22,6 +23,10 @@ class JournalIn(BaseModel):
     bait: str | None = Field(default=None, max_length=50)
     rig: str | None = Field(default=None, max_length=50)
     memo: str | None = Field(default=None, max_length=1000)
+    # 업로드해 둔 사진 ID (순서 = 표시 순서). None 이면 사진 변경 없음, [] 이면 모두 뺌
+    photo_ids: list[int] | None = Field(default=None, max_length=10)
+    # 「저장하고 인증 신청」: 저장과 함께 인증 검토를 신청 (사진 1장 이상·어종 필요)
+    request_verification: bool = False
 
     @field_validator("species_code", "species_etc", "bait", "rig", "memo", mode="before")
     @classmethod
@@ -60,6 +65,19 @@ class EnvSnapshotOut(ORMModel):
     source_agency: str | None
 
 
+class VerificationOut(BaseModel):
+    """사진 인증 상태. points = 이 일지로 현재 받은 포인트 합계 (인증 완료일 때만 0 초과)"""
+
+    status: VerificationStatus
+    requested_at: datetime | None
+    reviewed_at: datetime | None
+    reject_reason: str | None
+    points: int
+    # 지금 인증 신청이 가능한지와, 불가하면 빠진 조건 (예: 「사진 1장 이상」)
+    can_request: bool
+    missing: list[str]
+
+
 class JournalOut(BaseModel):
     id: int
     place_id: int
@@ -74,6 +92,10 @@ class JournalOut(BaseModel):
     rig: str | None
     memo: str | None
     photo_count: int
+    photos: list[PhotoOut]
+    verification: VerificationOut
+    # 이 일지를 공유한 커뮤니티 글 (없으면 None)
+    shared_post_id: int | None
     created_at: datetime
     updated_at: datetime
     env_snapshots: list[EnvSnapshotOut]

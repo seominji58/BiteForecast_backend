@@ -74,3 +74,19 @@ class ReportStatus(StrEnum):
     PENDING = "pending"
     REVIEWED = "reviewed"
     REJECTED = "rejected"
+
+
+class VerificationStatus(StrEnum):
+    """낚시일지 사진 인증 상태 (재설계 v2 §9). 포인트는 APPROVED 일지에서만 계산한다"""
+
+    NONE = "none"  # 개인 기록 (신청 안 함)
+    PENDING = "pending"  # 검토 대기
+    APPROVED = "approved"  # 관리자 승인
+    REJECTED = "rejected"  # 관리자 반려 (사유 포함)
+
+
+class PhotoPurpose(StrEnum):
+    """사진 용도. 인증용(일지)과 일반 게시글 사진을 구분한다 — 게시글 사진은 포인트와 무관"""
+
+    JOURNAL = "journal"
+    POST = "post"

@@ -30,6 +30,9 @@ class Post(TimestampMixin, Base):
     body: Mapped[str] = mapped_column(Text)
     place_id: Mapped[int | None] = mapped_column(ForeignKey("place.id"))
     species_code: Mapped[str | None] = mapped_column(ForeignKey("species.code"))
+    species_etc: Mapped[str | None] = mapped_column(String(50))  # 목록에 없는 어종 직접 입력
+    # 인증 완료된 내 낚시일지를 공유한 글 (「인증 조황」 배지). 포인트는 일지에서만 계산 — 글로는 지급 안 함
+    journal_id: Mapped[int | None] = mapped_column(ForeignKey("journal.id", ondelete="SET NULL"))
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     hidden: Mapped[bool] = mapped_column(Boolean, default=False)  # 신고 누적으로 숨김

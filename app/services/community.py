@@ -15,11 +15,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import AppUser, Place, PointLedger, Species, Title
+from app.models import AppUser, Journal, Photo, Place, PointLedger, Species, Title
 from app.models.base import utcnow
 from app.models.community import Comment, ContentReport, Post, PostCategory, PostLike, ReportTarget
+from app.models.enums import PhotoPurpose, VerificationStatus
 from app.schemas.community import (
     AuthorOut,
+    CatchOut,
     CommentIn,
     CommentOut,
     LikeOut,
@@ -29,7 +31,16 @@ from app.schemas.community import (
     ReportIn,
     ReportOut,
 )
+from app.services import photos
 from app.services.titles import resolve_title
+
+
+def species_name(db: Session, code: str | None, etc: str | None) -> str | None:
+    if code:
+        sp = db.get(Species, code)
+        return sp.name_ko if sp else code
+    return etc
+
 
 EXCERPT_LEN = 80
 POPULAR_WINDOW = timedelta(days=30)
@@ -102,6 +113,7 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
     out = []
     for p in posts:
         body = " ".join(p.body.split())
+        pics = _post_photos(db, p)
         out.append(
             PostSummaryOut(
                 id=p.id,
@@ -110,16 +122,43 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
                 excerpt=body[:EXCERPT_LEN] + ("…" if len(body) > EXCERPT_LEN else ""),
                 author=authors[p.user_id],
                 place_name=places.get(p.place_id) if p.place_id else None,
-                species_name=species.get(p.species_code) if p.species_code else None,
+                species_name=species.get(p.species_code) if p.species_code else p.species_etc,
                 like_count=likes.get(p.id, 0),
                 comment_count=comments.get(p.id, 0),
                 liked=p.id in liked,
                 mine=p.user_id == user.id,
                 popular=likes.get(p.id, 0) >= popular_min,
                 created_at=p.created_at,
+                verified=_verified_journal(db, p) is not None,
+                photo_count=len(pics),
+                thumb=photos.photo_out(pics[0]) if pics else None,
             )
         )
     return out
+
+
+def _verified_journal(db: Session, p: Post) -> Journal | None:
+    """공유된 일지가 지금도 인증 완료 상태일 때만 (반려·삭제되면 배지가 빠진다)"""
+    if p.journal_id is None:
+        return None
+    j = db.get(Journal, p.journal_id)
+    if j is None or j.deleted_at is not None or j.verification_status != VerificationStatus.APPROVED:
+        return None
+    return j
+
+
+def _post_photos(db: Session, p: Post) -> list[Photo]:
+    """글 사진: 일지 공유 글이면 (인증 완료 상태일 때) 일지 사진, 아니면 글에 올린 사진"""
+    j = _verified_journal(db, p)
+    if j is not None:
+        cond = Photo.journal_id == j.id
+    elif p.journal_id is not None:
+        return []
+    else:
+        cond = Photo.post_id == p.id
+    return list(
+        db.scalars(select(Photo).where(cond, Photo.deleted_at.is_(None)).order_by(Photo.sort_order, Photo.id))
+    )
 
 
 def list_posts(
@@ -162,9 +201,19 @@ def get_post(db: Session, user: AppUser, post_id: int) -> PostDetailOut:
         .order_by(Comment.created_at, Comment.id)
     ).all()
     authors = _authors(db, {c.user_id for c in comments}) if comments else {}
+    j = _verified_journal(db, p)
     return PostDetailOut(
         **summary.model_dump(),
         body=p.body,
+        photos=[photos.photo_out(x) for x in _post_photos(db, p)],
+        catch=CatchOut(
+            fished_at=j.fished_at,
+            species_name=species_name(db, j.species_code, j.species_etc),
+            count=j.count,
+            max_length_cm=j.max_length_cm,
+        )
+        if j is not None
+        else None,
         comments=[
             CommentOut(
                 id=c.id,
@@ -179,14 +228,39 @@ def get_post(db: Session, user: AppUser, post_id: int) -> PostDetailOut:
 
 
 def create_post(db: Session, user: AppUser, data: PostIn) -> PostDetailOut:
-    if data.place_id is not None:
-        place = db.get(Place, data.place_id)
-        if place is None or not place.is_active:
-            raise HTTPException(status_code=400, detail="지원하지 않는 장소입니다")
-    if data.species_code and db.get(Species, data.species_code) is None:
-        raise HTTPException(status_code=400, detail="알 수 없는 어종 코드입니다")
-    p = Post(user_id=user.id, **data.model_dump())
+    values = data.model_dump(exclude={"photo_ids", "journal_id"})
+    if data.journal_id is not None:
+        # 인증 완료된 내 일지 공유: 조황공유 글, 장소·어종·사진은 일지 것을 그대로 쓴다 (포인트 지급 없음)
+        j = db.get(Journal, data.journal_id)
+        if j is None or j.user_id != user.id or j.deleted_at is not None:
+            raise HTTPException(status_code=404, detail="공유할 기록을 찾을 수 없습니다")
+        if j.verification_status != VerificationStatus.APPROVED:
+            raise HTTPException(
+                status_code=400, detail="인증이 완료된 기록만 「인증 조황」으로 공유할 수 있습니다"
+            )
+        if db.scalar(select(Post.id).where(Post.journal_id == j.id, Post.deleted_at.is_(None))):
+            raise HTTPException(status_code=409, detail="이미 커뮤니티에 공유한 기록입니다")
+        if data.photo_ids:
+            raise HTTPException(status_code=400, detail="기록 공유 글에는 기록의 사진이 그대로 붙습니다")
+        values.update(
+            category=PostCategory.CATCH,
+            place_id=j.place_id,
+            species_code=j.species_code,
+            species_etc=j.species_etc,
+            journal_id=j.id,
+        )
+    else:
+        if data.place_id is not None:
+            place = db.get(Place, data.place_id)
+            if place is None or not place.is_active:
+                raise HTTPException(status_code=400, detail="지원하지 않는 장소입니다")
+        if data.species_code and db.get(Species, data.species_code) is None:
+            raise HTTPException(status_code=400, detail="알 수 없는 어종 코드입니다")
+    p = Post(user_id=user.id, **values)
     db.add(p)
+    db.flush()
+    if data.journal_id is None:
+        photos.attach(db, user, data.photo_ids, PhotoPurpose.POST, post=p)
     db.commit()
     return get_post(db, user, p.id)
 
@@ -196,6 +270,7 @@ def delete_post(db: Session, user: AppUser, post_id: int) -> None:
     if p.user_id != user.id:
         raise HTTPException(status_code=403, detail="내가 쓴 글만 삭제할 수 있습니다")
     p.deleted_at = utcnow()
+    photos.delete_for(db, post=p)  # 글에 올린 사진만 삭제 (공유한 일지 사진은 일지에 남는다)
     db.commit()
 
 

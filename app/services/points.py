@@ -1,10 +1,13 @@
 """활동 포인트 (FR-11) — 원장 재계산(derive) 방식.
 
-일지가 바뀔 때마다 사용자의 활성 일지 전체로 "있어야 할 포인트 이벤트"를 다시 계산하고,
+**인증 완료(approved) 일지만** 포인트 대상이다 (재설계 v2 §9).
+사진을 올리거나 일지를 저장하는 것만으로는 지급하지 않는다.
+
+일지·인증 상태가 바뀔 때마다 사용자의 인증 완료 일지 전체로 "있어야 할 포인트 이벤트"를 다시 계산하고,
 현재 원장 잔액과의 차이만 append-only 행으로 기록한다.
 
-- 같은 일지를 다시 저장해도 차이가 0 이므로 중복 지급되지 않는다 (TC-05)
-- 삭제/정정 시 없어진 이벤트는 음수 행으로 회수된다 (TC-06)
+- 같은 일지를 여러 번 승인·재저장해도 차이가 0 이므로 중복 지급되지 않는다 (키 = 사유 + 일지 ID, TC-05)
+- 인증이 반려·취소되거나 일지가 삭제되면 없어진 이벤트는 음수 행으로 회수된다 (TC-06)
 """
 
 from collections import defaultdict
@@ -13,13 +16,14 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import AppUser, Journal, JournalPhoto, PointLedger
-from app.models.enums import PointReason
+from app.models import AppUser, Journal, PointLedger
+from app.models.enums import PointReason, VerificationStatus
 
+# 「사진 첨부 +5」(PHOTO_ATTACHED)는 폐지 — 사진은 인증 조건이므로 중복.
+# 과거 원장 행의 이름 표시용으로 enum 만 남긴다
 POINTS: dict[PointReason, int] = {
     PointReason.JOURNAL_CREATED: 10,
     PointReason.DETAIL_FILLED: 5,
-    PointReason.PHOTO_ATTACHED: 5,
     PointReason.FIRST_PLACE: 15,
     PointReason.PERSONAL_BEST: 20,
 }
@@ -42,8 +46,8 @@ def species_key(j: Journal) -> str | None:
     return None
 
 
-def expected_events(journals: list[Journal], photo_counts: dict[int, int]) -> dict[EventKey, ExpectedEvent]:
-    """활성 일지 목록(출조 일시순)으로 있어야 할 이벤트를 계산한다"""
+def expected_events(journals: list[Journal]) -> dict[EventKey, ExpectedEvent]:
+    """인증 완료 일지 목록(출조 일시순)으로 있어야 할 이벤트를 계산한다"""
     events: dict[EventKey, ExpectedEvent] = {}
     seen_places: set[int] = set()
     best_by_species: dict[str, float] = {}
@@ -56,19 +60,14 @@ def expected_events(journals: list[Journal], photo_counts: dict[int, int]) -> di
         if sp and j.max_length_cm:
             events[(PointReason.DETAIL_FILLED, ref)] = ExpectedEvent(POINTS[PointReason.DETAIL_FILLED], j.id)
 
-        if photo_counts.get(j.id, 0) > 0:
-            events[(PointReason.PHOTO_ATTACHED, ref)] = ExpectedEvent(
-                POINTS[PointReason.PHOTO_ATTACHED], j.id
-            )
-
-        # 장소별 가장 이른 일지 1건에 귀속. 그 일지가 지워지면 다음 일지로 넘어간다
+        # 장소별 가장 이른 인증 일지 1건에 귀속. 그 일지가 빠지면 다음 인증 일지로 넘어간다
         if j.place_id not in seen_places:
             seen_places.add(j.place_id)
             events[(PointReason.FIRST_PLACE, f"place:{j.place_id}")] = ExpectedEvent(
                 POINTS[PointReason.FIRST_PLACE], j.id
             )
 
-        # 같은 어종의 직전 최대 길이를 "초과"할 때만. 어종의 첫 기록은 갱신이 아니다 (명세 D-9)
+        # 인증 일지끼리, 같은 어종의 직전 최대 길이를 "초과"할 때만. 어종의 첫 기록은 갱신이 아니다 (명세 D-9)
         if sp and j.max_length_cm:
             prev = best_by_species.get(sp)
             if prev is not None and j.max_length_cm > prev:
@@ -83,21 +82,17 @@ def expected_events(journals: list[Journal], photo_counts: dict[int, int]) -> di
 
 def recompute_points(db: Session, user: AppUser) -> int:
     """원장을 기대 상태에 맞춘다. 반환값 = 이번에 추가된 증감 합계 (flush 만 하고 commit 은 호출자가 한다)"""
-    journals = list(
-        db.scalars(select(Journal).where(Journal.user_id == user.id, Journal.deleted_at.is_(None))).all()
+    db.flush()  # 세션이 autoflush=False 라서, 방금 바꾼 인증 상태·삭제를 조회에 반영
+    approved = list(
+        db.scalars(
+            select(Journal).where(
+                Journal.user_id == user.id,
+                Journal.deleted_at.is_(None),
+                Journal.verification_status == VerificationStatus.APPROVED,
+            )
+        ).all()
     )
-    ids = [j.id for j in journals]
-    photo_counts: dict[int, int] = {}
-    if ids:
-        photo_counts = dict(
-            db.execute(
-                select(JournalPhoto.journal_id, func.count())
-                .where(JournalPhoto.journal_id.in_(ids), JournalPhoto.deleted_at.is_(None))
-                .group_by(JournalPhoto.journal_id)
-            ).all()
-        )
-
-    expected = expected_events(journals, photo_counts)
+    expected = expected_events(approved)
 
     current: dict[EventKey, int] = defaultdict(int)
     for reason, ref_key, total in db.execute(

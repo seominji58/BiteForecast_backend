@@ -28,6 +28,19 @@ class Settings(BaseSettings):
     community_hide_reports: int = 3
     community_popular_likes: int = 10
 
+    # 사진: EXIF 제거·축소 후 이 폴더에 저장 (git 제외). 업로드 한도와 글·일지당 장수
+    media_dir: str = "./media"
+    photo_max_bytes: int = 10 * 1024 * 1024
+    photo_max_side: int = 1600
+    photo_max_per_item: int = 4
+    # 업로드 후 일지·글에 연결되지 않은 사진은 이 시간이 지나면 정리 대상
+    photo_orphan_hours: int = 24
+
+    # 사진 인증 관리자 검토 (재설계 v2 §9). 비어 있으면 관리자 API·검토 화면을 막는다
+    admin_token: str = ""
+    # 촬영 시각(EXIF)과 출조 일시 차이가 이보다 크면 검토 화면에 「확인 필요」 표시 (자동 반려 아님)
+    verification_time_gap_hours: int = 48
+
 
 @lru_cache
 def get_settings() -> Settings:

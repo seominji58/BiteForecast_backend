@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from app.core.db import SessionLocal
 from app.models import PlaceStation, Station, TideForecast
 from app.models.enums import StationKind, StationRole
+from tests.conftest import ADMIN, upload
 
 URL = "/api/v1/journals"
 
@@ -56,41 +57,100 @@ def test_validation(client, device, places):
     assert client.post(URL, json=body(place_id=99999), headers=device).status_code == 400
 
 
-# --- 포인트 (FR-11) ---
+# --- 포인트 (FR-11): 인증 완료 일지만 지급 (재설계 v2 §9) ---
+
+
+def total(client, device) -> int:
+    return client.get("/api/v1/me/points", headers=device).json()["total_points"]
+
+
+def verified(client, device, **kw) -> dict:
+    """사진을 올리고 「저장하고 인증 신청」 → 관리자 승인까지 마친 일지"""
+    kw.setdefault("species_code", "rockfish")
+    photo = upload(client, device, color=(len(str(kw)) * 7 % 255, 90, 120))
+    j = create(client, device, photo_ids=[photo["id"]], request_verification=True, **kw)["journal"]
+    assert j["verification"]["status"] == "pending"
+    res = client.post(f"/api/v1/admin/verifications/{j['id']}/approve", headers=ADMIN)
+    assert res.status_code == 200, res.text
+    return j
+
+
+def test_no_points_without_verification(client, device, places):
+    """저장만 하거나 사진만 올려서는 포인트가 없다"""
+    out = create(client, device, place_id=places[0], species_code="rockfish", max_length_cm=30)
+    assert out["point_delta"] == 0 and out["journal"]["verification"]["status"] == "none"
+    photo = upload(client, device)
+    out = create(client, device, place_id=places[0], photo_ids=[photo["id"]])
+    assert out["point_delta"] == 0 and out["journal"]["photo_count"] == 1
+    # 인증 신청(대기)만으로도 없음
+    jid = out["journal"]["id"]
+    res = client.put(
+        f"{URL}/{jid}",
+        json=body(
+            place_id=places[0], species_code="rockfish", photo_ids=[photo["id"]], request_verification=True
+        ),
+        headers=device,
+    ).json()
+    assert res["journal"]["verification"]["status"] == "pending" and res["point_delta"] == 0
+    assert total(client, device) == 0
 
 
 def test_points_basic(client, device, places):
-    # 작성 10 + 첫 장소 15
-    assert create(client, device, place_id=places[0])["point_delta"] == 25
+    # 승인: 작성 10 + 첫 장소 15
+    verified(client, device, place_id=places[0])
+    assert total(client, device) == 25
     # 같은 장소 두 번째: 작성 10 + 어종·크기 5
-    out = create(
-        client,
-        device,
-        place_id=places[0],
-        when="2026-11-02T06:00:00+09:00",
-        species_code="rockfish",
-        max_length_cm=30,
-    )
-    assert out["point_delta"] == 15
-    assert out["total_points"] == 40
+    verified(client, device, place_id=places[0], when="2026-11-02T06:00:00+09:00", max_length_cm=30)
+    assert total(client, device) == 40
 
 
-def test_resave_does_not_double_award(client, device, places):
-    """TC-05: 동일 일지 재저장 시 재적립 없음"""
-    out = create(client, device, place_id=places[0], species_code="mackerel", max_length_cm=25)
-    jid, total = out["journal"]["id"], out["total_points"]
-    payload = body(place_id=places[0], species_code="mackerel", max_length_cm=25)
+def test_double_approve_and_resave_do_not_double_award(client, device, places):
+    """TC-05: 같은 기록을 여러 번 승인하거나 그대로 다시 저장해도 한 번만 반영"""
+    j = verified(client, device, place_id=places[0], species_code="mackerel", max_length_cm=25)
+    t = total(client, device)
     for _ in range(3):
-        res = client.put(f"{URL}/{jid}", json=payload, headers=device).json()
-        assert res["point_delta"] == 0
-        assert res["total_points"] == total
+        assert client.post(f"/api/v1/admin/verifications/{j['id']}/approve", headers=ADMIN).status_code == 200
+    assert total(client, device) == t
+    same = body(place_id=places[0], species_code="mackerel", max_length_cm=25)
+    res = client.put(f"{URL}/{j['id']}", json=same, headers=device).json()  # photo_ids 없음 = 사진 변경 없음
+    assert res["point_delta"] == 0 and res["journal"]["verification"]["status"] == "approved"
+
+
+def test_reject_and_edit_revoke_points(client, device, places):
+    """반려되면 회수 + 사유 표시, 인증 내용 수정 시 다시 검토 대기(포인트 회수)"""
+    j = verified(client, device, place_id=places[1], max_length_cm=40)
+    assert total(client, device) == 30
+    res = client.post(
+        f"/api/v1/admin/verifications/{j['id']}/reject",
+        json={"reason": "물고기가 보이지 않아요"},
+        headers=ADMIN,
+    )
+    assert res.status_code == 200
+    assert total(client, device) == 0
+    got = client.get(f"{URL}/{j['id']}", headers=device).json()["verification"]
+    assert got["status"] == "rejected" and got["reject_reason"] == "물고기가 보이지 않아요"
+
+    # 다시 신청 → 승인
+    assert (
+        client.post(f"{URL}/{j['id']}/verification", headers=device).json()["verification"]["status"]
+        == "pending"
+    )
+    client.post(f"/api/v1/admin/verifications/{j['id']}/approve", headers=ADMIN)
+    assert total(client, device) == 30
+    # 길이 수정 → 대기로 돌아가고 포인트 회수
+    res = client.put(
+        f"{URL}/{j['id']}",
+        json=body(place_id=places[1], species_code="rockfish", max_length_cm=45),
+        headers=device,
+    ).json()
+    assert res["journal"]["verification"]["status"] == "pending" and res["point_delta"] == -30
 
 
 def test_delete_recalculates_and_moves_first_place(client, device, places):
-    """TC-06: 삭제 시 회수, 첫 장소 보너스는 다음 일지로 이전"""
-    first = create(client, device, place_id=places[1], when="2026-11-01T06:00:00+09:00")["journal"]
-    create(client, device, place_id=places[1], when="2026-11-03T06:00:00+09:00")
-    assert client.get("/api/v1/me/points", headers=device).json()["total_points"] == 35
+    """TC-06: 삭제 시 회수, 첫 장소 보너스는 다음 인증 일지로 이전"""
+    first = verified(client, device, place_id=places[1], when="2026-11-01T06:00:00+09:00")
+    verified(client, device, place_id=places[1], when="2026-11-03T06:00:00+09:00")
+    assert total(client, device) == 35
 
     res = client.delete(f"{URL}/{first['id']}", headers=device).json()
     assert res["journal"] is None
@@ -100,34 +160,52 @@ def test_delete_recalculates_and_moves_first_place(client, device, places):
 
 def test_personal_best(client, device, places):
     p = places[2]
-    create(
+    verified(
         client, device, place_id=p, when="2026-10-01T06:00:00+09:00", species_code="seabass", max_length_cm=40
     )
-    # 같은 어종 기록 갱신 → +20 (작성 10 + 어종·크기 5 + 최대어 20)
-    out = create(
+    # 같은 어종 기록 갱신 → +35 (작성 10 + 어종·크기 5 + 최대어 20)
+    before = total(client, device)
+    verified(
         client, device, place_id=p, when="2026-10-05T06:00:00+09:00", species_code="seabass", max_length_cm=55
     )
-    assert out["point_delta"] == 35
-    # 갱신 기록을 더 작게 정정 → 최대어 20P 회수
-    jid = out["journal"]["id"]
-    res = client.put(
-        f"{URL}/{jid}",
-        json=body(place_id=p, when="2026-10-05T06:00:00+09:00", species_code="seabass", max_length_cm=35),
-        headers=device,
-    ).json()
-    assert res["point_delta"] == -20
+    assert total(client, device) - before == 35
 
 
 def test_title_changes_on_threshold(client, device, places):
     """칭호: 50P 도달 시 초보, 일지 삭제로 50P 미만이 되면 다시 입문"""
-    a = create(client, device, place_id=places[0], species_code="mullet", max_length_cm=40)  # 30P
-    assert a["title"]["current"]["name"] == "입문" and a["title_changed"] is False
-    b = create(client, device, place_id=places[1], species_code="mullet", max_length_cm=30)  # +30P
-    assert b["total_points"] == 60
-    assert b["title"]["current"]["name"] == "초보" and b["title_changed"] is True
+    verified(client, device, place_id=places[0], species_code="mullet", max_length_cm=40)  # 30P
+    b = verified(client, device, place_id=places[1], species_code="mullet", max_length_cm=30)  # +30P
+    title = client.get("/api/v1/me/title", headers=device).json()
+    assert title["total_points"] == 60 and title["current"]["name"] == "초보"
 
-    res = client.delete(f"{URL}/{b['journal']['id']}", headers=device).json()
+    res = client.delete(f"{URL}/{b['id']}", headers=device).json()
     assert res["title"]["current"]["name"] == "입문" and res["title_changed"] is True
+
+
+def test_verification_requires_photo_and_species(client, device, places):
+    j = create(client, device, place_id=places[0])["journal"]
+    assert j["verification"]["can_request"] is False
+    assert set(j["verification"]["missing"]) == {"사진 1장 이상", "어종"}
+    res = client.post(f"{URL}/{j['id']}/verification", headers=device)
+    assert res.status_code == 400
+    # 저장과 함께 신청해도 조건이 없으면 거절 (저장 자체가 실패)
+    res = client.post(URL, json=body(place_id=places[0], request_verification=True), headers=device)
+    assert res.status_code == 400
+
+
+def test_cancel_pending(client, device, places):
+    photo = upload(client, device)
+    j = create(
+        client,
+        device,
+        place_id=places[0],
+        species_etc="쥐노래미",
+        photo_ids=[photo["id"]],
+        request_verification=True,
+    )["journal"]
+    res = client.delete(f"{URL}/{j['id']}/verification", headers=device).json()
+    assert res["verification"]["status"] == "none"
+    assert client.delete(f"{URL}/{j['id']}/verification", headers=device).status_code == 400
 
 
 # --- 환경정보 연결 (FR-10, TC-02) ---
