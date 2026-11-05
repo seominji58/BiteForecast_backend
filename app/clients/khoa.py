@@ -31,12 +31,17 @@ AGENCY = "국립해양조사원"
 EP_TIDE_EXTREME = "tideFcstHghLw/GetTideFcstHghLwApiService"
 EP_TIDE_HOURLY = "tideFcstTime/GetTideFcstTimeApiService"
 EP_BUOY = "twRecent/GetTWRecentApiService"
+# 바다낚시지수: gubun(갯바위/선상) 필수. 2026-11-05 확인 시 두 값의 응답이 동일했다
+EP_FISHING_INDEX = "fcstFishingv2/GetFcstFishingApiServicev2"
 
 DATASET_NAMES = {
     EP_TIDE_EXTREME: "조석예보(고·저조)",
     EP_TIDE_HOURLY: "조석예보(시계열)",
     EP_BUOY: "해양관측부이 최신 관측데이터",
+    EP_FISHING_INDEX: "바다낚시지수",
 }
+
+FISHING_INDEX_LEVELS = ("매우좋음", "좋음", "보통", "나쁨", "매우나쁨")
 
 
 class KhoaError(Exception):
@@ -62,6 +67,22 @@ class TideExtremeRow:
 class TideLevelRow:
     t: datetime
     level_cm: float | None
+
+
+@dataclass(frozen=True)
+class FishingIndexRow:
+    point: str
+    day: date
+    period: str
+    species: str
+    index: str | None
+    tide_phase: str | None
+    min_wave_m: float | None
+    max_wave_m: float | None
+    min_water_temp: float | None
+    max_water_temp: float | None
+    min_wind_ms: float | None
+    max_wind_ms: float | None
 
 
 @dataclass(frozen=True)
@@ -182,6 +203,38 @@ class KhoaClient:
         return _parse_tide_hourly(items)
 
     # --- 부이 ---
+
+    # --- 바다낚시지수 ---
+
+    def fishing_index(self, day: date, gubun: str = "갯바위") -> list[FishingIndexRow]:
+        """전국 지점·어종별 지수 (요청일부터 약 7일치). 300건씩 페이지를 넘겨 전체를 받는다"""
+        rows: list[FishingIndexRow] = []
+        for page in range(1, 30):
+            items = self._get(
+                EP_FISHING_INDEX,
+                {"reqDate": day.strftime("%Y%m%d"), "gubun": gubun, "pageNo": page, "numOfRows": 300},
+            )
+            rows += [
+                FishingIndexRow(
+                    point=i["seafsPstnNm"],
+                    day=date.fromisoformat(i["predcYmd"]),
+                    period=i.get("predcNoonSeCd") or "일",
+                    species=i.get("seafsTgfshNm") or "-",
+                    index=i.get("totalIndex") if i.get("totalIndex") in FISHING_INDEX_LEVELS else None,
+                    tide_phase=i.get("tdlvHrCn") or None,
+                    min_wave_m=_num(i.get("minWvhgt")),
+                    max_wave_m=_num(i.get("maxWvhgt")),
+                    min_water_temp=_num(i.get("minWtem")),
+                    max_water_temp=_num(i.get("maxWtem")),
+                    min_wind_ms=_num(i.get("minWspd")),
+                    max_wind_ms=_num(i.get("maxWspd")),
+                )
+                for i in items
+                if i.get("seafsPstnNm") and i.get("predcYmd")
+            ]
+            if len(items) < 300:
+                break
+        return rows
 
     def buoy_observations(self, obs_code: str, day: date) -> list[BuoyRow]:
         items = self._get(EP_BUOY, {"obsCode": obs_code, "reqDate": day.strftime("%Y%m%d"), "min": 60})

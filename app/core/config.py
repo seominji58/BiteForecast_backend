@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     # 비교 조회 가능 범위 (오늘 기준, KST). 수집 배치도 이 범위를 수집한다
     compare_days_back: int = 3
     compare_days_ahead: int = 7
+    # 바다낚시지수 지점이 이보다 멀면 「가까운 지수 지점 없음」으로 표시
+    fishing_index_max_km: float = 10
 
 
 @lru_cache

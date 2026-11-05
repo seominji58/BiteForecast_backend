@@ -13,7 +13,8 @@ SeriesStatus = Literal["ok", "unavailable"]
 #   NO_DATA        관측소는 있으나 해당 날짜 자료 없음
 #   FUTURE_DATE    미래 날짜에는 실측이 없음
 #   NOT_CONNECTED  자료 출처가 아직 연결되지 않음 (예: 파고·풍속 예보)
-SeriesReason = Literal["NO_STATION", "NO_DATA", "FUTURE_DATE", "NOT_CONNECTED"]
+#   TOO_FAR        가장 가까운 지점이 너무 멀어 표시하지 않음 (바다낚시지수)
+SeriesReason = Literal["NO_STATION", "NO_DATA", "FUTURE_DATE", "NOT_CONNECTED", "TOO_FAR"]
 
 
 class SourceOut(BaseModel):
@@ -69,10 +70,32 @@ class RegulationOut(BaseModel):
     items: list[RestrictionOut]
 
 
+class FishingSpeciesOut(BaseModel):
+    species: str
+    index: str | None  # 매우좋음/좋음/보통/나쁨/매우나쁨 (기관 발표값 그대로)
+
+
+class FishingPeriodOut(BaseModel):
+    period: str  # 오전 / 오후 / 일
+    tide_phase: str | None
+    items: list[FishingSpeciesOut]
+
+
+class FishingIndexOut(BaseModel):
+    """국립해양조사원 바다낚시지수. 앱이 판정한 값이 아니라 공식 발표 지수를 그대로 전달한다"""
+
+    status: SeriesStatus
+    reason: SeriesReason | None = None
+    source: SourceOut | None = None
+    fetched_at: datetime | None = None
+    periods: list[FishingPeriodOut] | None = None
+
+
 class PlaceCompareOut(BaseModel):
     place: PlaceOut
     region_name: str
     regulation: RegulationOut
+    fishing_index: FishingIndexOut
     series: list[SeriesOut]
 
 

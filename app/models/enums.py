@@ -13,12 +13,14 @@ class StationKind(StrEnum):
     TIDE = "tide"  # 조위관측소
     BUOY = "buoy"  # 해양관측부이
     KMA = "kma"  # 기상청 지점/격자
+    FISHING_INDEX = "fishing_index"  # 바다낚시지수 지점
 
 
 class StationRole(StrEnum):
     TIDE = "tide"  # 조석 예보지점
     OCEAN = "ocean"  # 해양관측 부이 (실측)
     FORECAST = "forecast"  # 기상청 단기예보 격자 (파고·풍속 예보)
+    FISHING_INDEX = "fishing_index"  # 국립해양조사원 바다낚시지수 지점
 
 
 class DataKind(StrEnum):

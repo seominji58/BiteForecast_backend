@@ -3,7 +3,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException
 
 from app.api.deps import DbSession
-from app.clients.khoa import AGENCY, DATASET_NAMES, EP_BUOY, EP_TIDE_EXTREME, EP_TIDE_HOURLY
+from app.clients.khoa import AGENCY, DATASET_NAMES, EP_BUOY, EP_FISHING_INDEX, EP_TIDE_EXTREME, EP_TIDE_HOURLY
 from app.models import Place
 from app.models.enums import DataKind
 from app.schemas.compare import CompareOut, DataSourceOut, DateRangeOut, RegulationOut
@@ -35,6 +35,13 @@ def sources():
             agency=AGENCY, dataset=DATASET_NAMES[EP_TIDE_HOURLY], kind=DataKind.FORECAST, connected=True
         ),
         DataSourceOut(agency=AGENCY, dataset=DATASET_NAMES[EP_BUOY], kind=DataKind.OBSERVED, connected=True),
+        DataSourceOut(
+            agency=AGENCY,
+            dataset=DATASET_NAMES[EP_FISHING_INDEX],
+            kind=DataKind.FORECAST,
+            connected=True,
+            note="기관이 발표한 5단계 지수를 그대로 표시 (앱 자체 판정 아님)",
+        ),
         DataSourceOut(
             agency="기상청", dataset="단기예보 (파고·풍속)", kind=DataKind.FORECAST, connected=True
         ),

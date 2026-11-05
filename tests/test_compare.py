@@ -166,3 +166,66 @@ def test_validation(client, setup):
 def test_date_range(client):
     r = client.get("/api/v1/meta/date-range").json()
     assert r["min"] < r["today"] < r["max"]
+
+
+@pytest.fixture(scope="module")
+def fishing_setup(client, setup):
+    """장소 A: 지수 지점 3km (표시), 장소 B: 지수 지점 25km (TOO_FAR)"""
+    from app.models import FishingIndex
+
+    with SessionLocal() as db:
+        near = Station(
+            provider="KHOA", external_id="지수지점A", name="지수지점A", kind=StationKind.FISHING_INDEX
+        )
+        far = Station(
+            provider="KHOA", external_id="지수지점B", name="지수지점B", kind=StationKind.FISHING_INDEX
+        )
+        db.add_all([near, far])
+        db.flush()
+        db.add_all(
+            [
+                PlaceStation(
+                    place_id=setup["a"], role=StationRole.FISHING_INDEX, station_id=near.id, distance_km=3.0
+                ),
+                PlaceStation(
+                    place_id=setup["b"], role=StationRole.FISHING_INDEX, station_id=far.id, distance_km=25.0
+                ),
+            ]
+        )
+        now = utcnow()
+        for period, species, idx in [
+            ("오후", "우럭", "보통"),
+            ("오전", "감성돔", "좋음"),
+            ("오전", "기타어종", "나쁨"),
+        ]:
+            for st in (near, far):
+                db.add(
+                    FishingIndex(
+                        station_id=st.id,
+                        day=setup["today"],
+                        period=period,
+                        species=species,
+                        index=idx,
+                        tide_phase="소조기",
+                        fetched_at=now,
+                    )
+                )
+        db.commit()
+    return setup
+
+
+def test_fishing_index_official_value_and_too_far(client, fishing_setup):
+    s = fishing_setup
+    a, b = client.get(URL, params={"place_a": s["a"], "place_b": s["b"], "date": str(s["today"])}).json()[
+        "places"
+    ]
+    fa = a["fishing_index"]
+    assert fa["status"] == "ok"
+    assert fa["source"]["dataset"] == "바다낚시지수" and fa["source"]["distance_km"] == 3.0
+    assert [p["period"] for p in fa["periods"]] == ["오전", "오후"]  # 시간대 순서
+    assert [i["species"] for i in fa["periods"][0]["items"]] == ["감성돔", "기타어종"]  # 기타는 뒤로
+    assert fa["periods"][0]["items"][0]["index"] == "좋음"  # 기관 발표값 그대로
+
+    fb = b["fishing_index"]
+    assert fb["status"] == "unavailable" and fb["reason"] == "TOO_FAR"
+    assert fb["source"]["distance_km"] == 25.0 and fb["periods"] is None

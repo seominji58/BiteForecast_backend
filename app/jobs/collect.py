@@ -4,6 +4,7 @@
 - 조석 고·저조 / 시계열 예측: 오늘-N ~ 오늘+M 일
 - 부이 실측: 오늘-N ~ 오늘 (미래 실측은 없음)
 - 기상청 단기예보(파고·풍속): 최신 발표분 (약 5일)
+- 바다낚시지수: 오늘부터 약 7일 (전국 응답 중 매핑된 지점만 저장)
 같은 관측소·날짜는 지우고 다시 넣는다 (최신 조회 결과로 교체).
 수집 후, 해당 기간에 출조한 일지의 환경정보 스냅샷을 다시 연결한다 (FR-10).
 
@@ -26,7 +27,7 @@ from app.clients.kma import KmaForecastClient, latest_base_time
 from app.core.config import get_settings
 from app.core.db import SessionLocal, init_db
 from app.core.timeutil import kst_day_range, today_kst
-from app.models import Journal, OceanReading, PlaceStation, Station, TideExtreme, TideForecast
+from app.models import FishingIndex, Journal, OceanReading, PlaceStation, Station, TideExtreme, TideForecast
 from app.models.base import utcnow
 from app.models.enums import DataKind, Metric, StationRole
 from app.services.envlink import link_environment
@@ -76,6 +77,9 @@ def collect_once(client: KmaForecastClient | None = None) -> Counter:
             for st in _mapped_stations(db, StationRole.FORECAST):
                 _collect_forecast(db, client, st, base, stats, disabled)
                 db.commit()
+
+            _collect_fishing_index(db, client, today, _mapped_stations(db, StationRole.FISHING_INDEX), stats)
+            db.commit()
 
             # 일지 환경정보 재연결 (수집 기간에 출조한 일지)
             lo, _ = kst_day_range(window[0])
@@ -217,6 +221,50 @@ def _collect_forecast(
                 )
             )
     stats["forecast_rows"] += len(rows)
+
+
+def _collect_fishing_index(db, client, today: date, stations: list[Station], stats: Counter) -> None:
+    """국립해양조사원 바다낚시지수. 한 번 호출로 전국 지점이 오므로 매핑된 지점만 골라 저장한다"""
+    if not stations:
+        return
+    try:
+        rows = client.fishing_index(today)
+    except KhoaError as e:
+        log.error("바다낚시지수 수집 실패: %s", e)
+        stats["fishing_index_errors"] += 1
+        return
+    by_name = {st.external_id: st for st in stations}
+    db.execute(
+        delete(FishingIndex).where(
+            FishingIndex.station_id.in_([st.id for st in stations]), FishingIndex.day >= today
+        )
+    )
+    now = utcnow()
+    seen: set[tuple] = set()
+    for r in rows:
+        st = by_name.get(r.point)
+        key = (r.point, r.day, r.period, r.species)
+        if st is None or key in seen:
+            continue
+        seen.add(key)
+        db.add(
+            FishingIndex(
+                station_id=st.id,
+                day=r.day,
+                period=r.period,
+                species=r.species,
+                index=r.index,
+                tide_phase=r.tide_phase,
+                min_wave_m=r.min_wave_m,
+                max_wave_m=r.max_wave_m,
+                min_water_temp=r.min_water_temp,
+                max_water_temp=r.max_water_temp,
+                min_wind_ms=r.min_wind_ms,
+                max_wind_ms=r.max_wind_ms,
+                fetched_at=now,
+            )
+        )
+    stats["fishing_index_rows"] += len(seen)
 
 
 def _handle_error(e: KhoaError, dataset: str, st: Station, day: date, stats: Counter, disabled: set) -> None:

@@ -12,18 +12,28 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.clients.khoa import AGENCY, DATASET_NAMES, EP_BUOY, EP_TIDE_EXTREME, EP_TIDE_HOURLY
+from app.clients.khoa import (
+    AGENCY,
+    DATASET_NAMES,
+    EP_BUOY,
+    EP_FISHING_INDEX,
+    EP_TIDE_EXTREME,
+    EP_TIDE_HOURLY,
+)
 from app.clients.kma import AGENCY as KMA_AGENCY
 from app.clients.kma import DATASET as KMA_DATASET
 from app.core.config import get_settings
 from app.core.timeutil import kst_day_range, today_kst
-from app.models import OceanReading, Place, PlaceStation, TideExtreme, TideForecast
+from app.models import FishingIndex, OceanReading, Place, PlaceStation, TideExtreme, TideForecast
 from app.models.base import utcnow
 from app.models.enums import DataKind, Metric, StationRole
 from app.schemas.compare import (
     CompareOut,
     DateRangeOut,
     ExtremeOut,
+    FishingIndexOut,
+    FishingPeriodOut,
+    FishingSpeciesOut,
     PlaceCompareOut,
     PointOut,
     SeriesOut,
@@ -224,7 +234,48 @@ def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
         place=PlaceOut.model_validate(place),
         region_name=place.region.name,
         regulation=evaluate(db, place.id, day),
+        fishing_index=_fishing_index(db, by_role.get(StationRole.FISHING_INDEX), day),
         series=series,
+    )
+
+
+_PERIOD_ORDER = {"오전": 0, "오후": 1, "일": 2}
+_SPECIES_LAST = {"기타어종", "-"}
+
+
+def _fishing_index(db: Session, ps: PlaceStation | None, day: date) -> FishingIndexOut:
+    """공식 바다낚시지수를 그대로 전달한다. 지점이 멀면 TOO_FAR (앱이 대신 판정하지 않음)"""
+    if ps is None:
+        return FishingIndexOut(status="unavailable", reason="NO_STATION")
+    source = _source(ps, EP_FISHING_INDEX)
+    if ps.distance_km is not None and ps.distance_km > get_settings().fishing_index_max_km:
+        return FishingIndexOut(status="unavailable", reason="TOO_FAR", source=source)
+
+    rows = db.scalars(
+        select(FishingIndex).where(FishingIndex.station_id == ps.station_id, FishingIndex.day == day)
+    ).all()
+    if not rows:
+        return FishingIndexOut(status="unavailable", reason="NO_DATA", source=source)
+
+    periods: dict[str, list[FishingIndex]] = {}
+    for r in rows:
+        periods.setdefault(r.period, []).append(r)
+    return FishingIndexOut(
+        status="ok",
+        source=source,
+        fetched_at=max(r.fetched_at for r in rows),
+        periods=[
+            FishingPeriodOut(
+                period=period,
+                tide_phase=next((r.tide_phase for r in items if r.tide_phase), None),
+                items=[
+                    FishingSpeciesOut(species=r.species, index=r.index)
+                    for r in sorted(items, key=lambda r: (r.species in _SPECIES_LAST, r.species))
+                    if r.species != "-"
+                ],
+            )
+            for period, items in sorted(periods.items(), key=lambda kv: _PERIOD_ORDER.get(kv[0], 9))
+        ],
     )
 
 

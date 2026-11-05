@@ -117,3 +117,47 @@ def test_tide_hourly_parsed():
     rows = client_with(200, TIDE_HOURLY_OK).tide_hourly("DT_0012", date(2026, 11, 5))
     assert [r.t.hour for r in rows] == [0, 1]
     assert rows[0].level_cm == 21.71
+
+
+# 2026-11-05 실제 응답 형식 (바다낚시지수)
+FISHING_OK = {
+    "header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+    "body": {
+        "items": {
+            "item": [
+                {
+                    "seafsPstnNm": "외옹치항",
+                    "lat": 38.18,
+                    "lot": 128.6,
+                    "predcYmd": "2026-11-05",
+                    "predcNoonSeCd": "오전",
+                    "seafsTgfshNm": "감성돔",
+                    "tdlvHrCn": "소조기",
+                    "minWvhgt": 0.9,
+                    "maxWvhgt": 1.2,
+                    "totalIndex": "나쁨",
+                },
+                {
+                    "seafsPstnNm": "외옹치항",
+                    "lat": 38.18,
+                    "lot": 128.6,
+                    "predcYmd": "2026-11-08",
+                    "predcNoonSeCd": "일",
+                    "seafsTgfshNm": "우럭",
+                    "tdlvHrCn": "중조기",
+                    "totalIndex": "알수없음",
+                },
+            ]
+        },
+        "totalCount": 2,
+    },
+}
+
+
+def test_fishing_index_parsed():
+    rows = client_with(200, FISHING_OK).fishing_index(date(2026, 11, 5))
+    assert [(r.point, r.period, r.species, r.index) for r in rows] == [
+        ("외옹치항", "오전", "감성돔", "나쁨"),
+        ("외옹치항", "일", "우럭", None),  # 5단계 외의 값은 저장하지 않음
+    ]
+    assert rows[0].tide_phase == "소조기" and rows[0].max_wave_m == 1.2

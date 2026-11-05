@@ -69,6 +69,12 @@ def main() -> None:
         ]
         # 비교 화면의 핵심 지표(파고·풍속)를 모두 관측하는 부이만 매핑 후보로 쓴다
         ocean_candidates = [(st, s) for st, s in buoys if s.get("has_wave") and s.get("has_wind")]
+        # 바다낚시지수 지점 (지점명이 API 의 식별자)
+        fishing_points = json.loads((HERE / "fishing_points.json").read_text(encoding="utf-8"))["points"]
+        fishing = [
+            (_upsert_station(db, f["name"], f["name"], StationKind.FISHING_INDEX, f["lat"], f["lon"]), f)
+            for f in fishing_points
+        ]
         db.flush()
 
         # 개발용 샘플 해역 비활성화
@@ -118,6 +124,10 @@ def main() -> None:
                 )
                 db.flush()
                 _map(db, place, StationRole.FORECAST, grid, buoy_d, label)
+
+                # 가장 가까운 바다낚시지수 지점 (멀면 비교 화면에서 「가까운 지수 지점 없음」으로 처리)
+                fish_st, fish_d = _nearest(place, fishing)
+                _map(db, place, StationRole.FISHING_INDEX, fish_st, fish_d, label)
                 n_places += 1
 
         db.commit()
