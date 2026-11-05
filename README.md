@@ -7,6 +7,8 @@
 
 ## 실행
 
+> 매일 켜는 순서, 휴대폰 연결(터널), 자주 나는 문제는 **[실행 가이드](https://github.com/seominji58/BiteForecast_docs/blob/main/06_개발환경/실행_가이드.md)** 참고
+
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate
@@ -25,12 +27,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 - API 문서: http://localhost:8000/docs
 - 헬스체크: `GET /api/v1/health`
-- DB 스키마가 바뀌면 `biteforecast.db`를 지우고 다시 실행한다 (Alembic 도입 전까지)
+- 사진 인증 관리자 화면: http://localhost:8000/api/v1/admin (`ADMIN_TOKEN` 필요)
+- DB 스키마가 바뀌어도 지울 필요 없다. 서버가 켜질 때 새 테이블·컬럼만 추가한다 (운영 전환 시 Alembic)
 
 | 환경변수 | 내용 |
 |---|---|
-| `DATA_GO_KR_API_KEY` | 공공데이터포털 인증키 (국립해양조사원 조석예보·조위관측소·해양관측부이) |
-| `KMA_API_KEY` | 기상청 API허브 인증키 (해양기상 예보·관측) |
+| `DATA_GO_KR_API_KEY` | 공공데이터포털 인증키 (국립해양조사원 물때·부이·바다낚시지수, 기상청 단기예보·특보) |
+| `KMA_API_KEY` | 기상청 API허브 인증키 (현재 사용 안 함) |
+| `ADMIN_TOKEN` | 사진 인증 관리자 검토 비밀값 (비우면 관리자 기능 차단) |
+| `MEDIA_DIR` | 업로드 사진 저장 폴더 (기본 `./media`, git 제외) |
 
 ## 테스트
 
