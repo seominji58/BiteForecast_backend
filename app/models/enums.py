@@ -6,6 +6,9 @@ class PlaceType(StrEnum):
     ROCK = "rock"  # 갯바위
     WHARF = "wharf"  # 선착장
     BEACH = "beach"  # 해변
+    PAID = "paid"  # 신고 유료 낚시터 (좌대·방갈로 등)
+    POINT = "point"  # 낚시 포인트 (바다낚시지수 지점)
+    BOAT = "boat"  # 선상 포인트 (해상)
     OTHER = "other"
 
 

@@ -69,3 +69,11 @@ def test_latest_base_time():
 def test_grid_matches_kma_reference():
     # 기상청 격자 예: 서울 종로구 (60, 127)
     assert latlon_to_grid(37.5729, 126.9794) == (60, 127)
+
+
+def test_grid_roundtrip():
+    from app.core.kma_grid import grid_to_latlon
+
+    lat, lon = grid_to_latlon(60, 127)
+    assert latlon_to_grid(lat, lon) == (60, 127)
+    assert abs(lat - 37.57) < 0.05 and abs(lon - 126.98) < 0.05

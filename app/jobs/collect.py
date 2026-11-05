@@ -19,7 +19,7 @@ import time
 from collections import Counter
 from datetime import date, timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.clients.khoa import BuoyRow, KhoaError
@@ -102,8 +102,18 @@ def collect_once(client: KmaForecastClient | None = None) -> Counter:
     return stats
 
 
+def _has_rows(db, model, st: Station, day: date) -> bool:
+    lo, hi = kst_day_range(day)
+    return (
+        db.scalar(select(model.id).where(model.station_id == st.id, model.t >= lo, model.t < hi).limit(1))
+        is not None
+    )
+
+
 def _collect_tide_extremes(db, client, st: Station, day: date, stats: Counter, disabled: set) -> None:
-    if "tide_extreme" in disabled:
+    # 조석 예측(천문조)은 다시 받아도 같으므로 이미 받은 관측소·날짜는 건너뛴다 (API 호출량 절약)
+    if "tide_extreme" in disabled or _has_rows(db, TideExtreme, st, day):
+        stats["tide_extreme_skipped"] += 1
         return
     try:
         rows = client.tide_extremes(st.external_id, day)
@@ -124,7 +134,8 @@ def _collect_tide_extremes(db, client, st: Station, day: date, stats: Counter, d
 
 
 def _collect_tide_hourly(db, client, st: Station, day: date, stats: Counter, disabled: set) -> None:
-    if "tide_hourly" in disabled:
+    if "tide_hourly" in disabled or _has_rows(db, TideForecast, st, day):
+        stats["tide_hourly_skipped"] += 1
         return
     try:
         rows = client.tide_hourly(st.external_id, day)
@@ -148,6 +159,23 @@ def _collect_tide_hourly(db, client, st: Station, day: date, stats: Counter, dis
 def _collect_buoy(db, client, st: Station, day: date, stats: Counter, disabled: set) -> None:
     if "buoy" in disabled:
         return
+    lo, hi = kst_day_range(day)
+    if hi <= utcnow():
+        # 지난 날짜: 그 날이 끝난 뒤에 받은 적이 있으면 더 바뀌지 않음
+        done = db.scalar(
+            select(OceanReading.id)
+            .where(
+                OceanReading.station_id == st.id,
+                OceanReading.kind == DataKind.OBSERVED,
+                OceanReading.t >= lo,
+                OceanReading.t < hi,
+                OceanReading.fetched_at >= hi,
+            )
+            .limit(1)
+        )
+        if done is not None:
+            stats["buoy_skipped"] += 1
+            return
     try:
         rows: list[BuoyRow] = client.buoy_observations(st.external_id, day)
     except KhoaError as e:
@@ -186,6 +214,14 @@ def _collect_forecast(
 ) -> None:
     """기상청 단기예보(파고·풍속). 격자 코드 'nx,ny'. 새 발표가 덮는 시각 이후의 예보를 교체한다"""
     if "kma_forecast" in disabled:
+        return
+    latest = db.scalar(
+        select(func.max(OceanReading.issued_at)).where(
+            OceanReading.station_id == st.id, OceanReading.kind == DataKind.FORECAST
+        )
+    )
+    if latest is not None and latest >= base:
+        stats["forecast_skipped"] += 1  # 같은 발표분은 이미 받음
         return
     nx, ny = (int(v) for v in st.external_id.split(","))
     try:
@@ -226,6 +262,10 @@ def _collect_forecast(
 def _collect_fishing_index(db, client, today: date, stations: list[Station], stats: Counter) -> None:
     """국립해양조사원 바다낚시지수. 한 번 호출로 전국 지점이 오므로 매핑된 지점만 골라 저장한다"""
     if not stations:
+        return
+    last = db.scalar(select(func.max(FishingIndex.fetched_at)))
+    if last is not None and utcnow() - last < timedelta(hours=6):
+        stats["fishing_index_skipped"] += 1  # 하루 2회(오전·오후) 갱신이면 충분
         return
     try:
         rows = client.fishing_index(today)

@@ -10,10 +10,23 @@ class RegionOut(ORMModel):
 class PlaceOut(ORMModel):
     id: int
     region_id: int
+    region_name: str
     name: str
     type: PlaceType
     lat: float | None
     lon: float | None
+    address: str | None
+
+
+class PlaceInfoOut(ORMModel):
+    source: str
+    address: str | None
+    phone: str | None
+    species: str | None
+    fee: str | None
+    facility: str | None
+    manager: str | None
+    data_date: str | None
 
 
 class PlaceStationOut(ORMModel):
@@ -25,4 +38,5 @@ class PlaceStationOut(ORMModel):
 
 
 class PlaceDetailOut(PlaceOut):
+    info: PlaceInfoOut | None
     stations: list[PlaceStationOut]

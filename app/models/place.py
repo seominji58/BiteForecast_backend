@@ -32,6 +32,15 @@ class Place(Base):
 
     region: Mapped[Region] = relationship(back_populates="places")
     stations: Mapped[list["PlaceStation"]] = relationship(back_populates="place")
+    info: Mapped["PlaceInfo | None"] = relationship(back_populates="place", uselist=False)
+
+    @property
+    def region_name(self) -> str:
+        return self.region.name
+
+    @property
+    def address(self) -> str | None:
+        return self.info.address if self.info else None
 
 
 class Station(Base):
@@ -61,6 +70,24 @@ class PlaceStation(Base):
 
     place: Mapped[Place] = relationship(back_populates="stations")
     station: Mapped[Station] = relationship()
+
+
+class PlaceInfo(Base):
+    """장소 부가정보 (출처별로 있는 항목만)"""
+
+    __tablename__ = "place_info"
+
+    place_id: Mapped[int] = mapped_column(ForeignKey("place.id"), primary_key=True)
+    source: Mapped[str] = mapped_column(String(50))
+    address: Mapped[str | None] = mapped_column(String(200))
+    phone: Mapped[str | None] = mapped_column(String(50))
+    species: Mapped[str | None] = mapped_column(String(200))
+    fee: Mapped[str | None] = mapped_column(String(300))
+    facility: Mapped[str | None] = mapped_column(String(100))
+    manager: Mapped[str | None] = mapped_column(String(100))
+    data_date: Mapped[str | None] = mapped_column(String(20))
+
+    place: Mapped[Place] = relationship(back_populates="info")
 
 
 class Species(Base):

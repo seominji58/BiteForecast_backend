@@ -13,8 +13,11 @@ source .venv/bin/activate
 pip install -r requirements-dev.txt
 cp .env.example .env   # DATA_GO_KR_API_KEY, KMA_API_KEY 입력
 
-# (선택) 개발용 샘플 해역·장소 추가 — 실제 해역(D-3) 확정 전 화면 개발용
-python -m seeds.dev_sample
+# 지원 장소·관측소 적재 (219곳: 신고 바다 낚시터 + 바다낚시지수 지점 + 수동 지정)
+python -m seeds.load
+
+# 공공 데이터 수집 (처음 1회는 수 분 소요, 이후에는 받은 자료를 건너뜀). 계속 갱신하려면 --loop
+python -m app.jobs.collect
 
 # 0.0.0.0 으로 열어야 같은 Wi-Fi 의 휴대폰(Expo Go)에서 접속 가능
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
