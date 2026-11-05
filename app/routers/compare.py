@@ -5,10 +5,13 @@ from fastapi import APIRouter, HTTPException
 from app.api.deps import DbSession
 from app.clients.khoa import AGENCY, DATASET_NAMES, EP_BUOY, EP_FISHING_INDEX, EP_TIDE_EXTREME, EP_TIDE_HOURLY
 from app.models import Place
+from app.models.base import utcnow
 from app.models.enums import DataKind
 from app.schemas.compare import CompareOut, DataSourceOut, DateRangeOut, PlaceConditionsOut, RegulationOut
+from app.schemas.summary import PlacesSummaryOut
 from app.services import compare as svc
 from app.services.regulation import evaluate
+from app.services.summary import summarize
 
 router = APIRouter(tags=["compare"])
 
@@ -17,6 +20,18 @@ router = APIRouter(tags=["compare"])
 def compare(place_a: int, place_b: int, date: date, db: DbSession):
     """A/B 두 장소의 같은 날짜 환경조건 비교 (FR-02~05, FR-07)"""
     return svc.compare(db, place_a, place_b, date)
+
+
+@router.get("/places-summary", response_model=PlacesSummaryOut)
+def places_summary(date: date, db: DbSession):
+    """전체 낚시터 요약 (지도·주변 찾기·조건으로 찾기). 실측 최신·예보 최대·특보·공식 지수만, 판정 없음"""
+    svc._check_day(date)
+    return PlacesSummaryOut(
+        date=date.isoformat(),
+        generated_at=utcnow(),
+        places=summarize(db, date),
+        disclaimer=svc.DISCLAIMER,
+    )
 
 
 @router.get("/places/{place_id}/conditions", response_model=PlaceConditionsOut)

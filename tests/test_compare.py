@@ -315,3 +315,19 @@ def test_fishing_index_species_dash_shown_as_common(client):
     ]
     assert f["status"] == "ok"
     assert f["periods"][0]["items"] == [{"species": "어종 공통", "index": "보통"}]
+
+
+def test_places_summary(client, places):
+    from app.core.timeutil import today_kst
+
+    res = client.get(f"/api/v1/places-summary?date={today_kst().isoformat()}")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    ids = {p["place_id"] for p in body["places"]}
+    assert set(places) <= ids
+    p = next(x for x in body["places"] if x["place_id"] == places[0])
+    # 관측소가 없는 테스트 장소: 값을 만들지 않고 null, 특보는 「확인 불가」(없음으로 단정하지 않음)
+    assert p["wave_obs"] is None and p["wave_fc_max"] is None and p["index"] is None
+    assert p["warning_level"] == "unknown"
+    assert "보장하지 않으며" in body["disclaimer"]
+    assert client.get("/api/v1/places-summary?date=2000-01-01").status_code == 400
