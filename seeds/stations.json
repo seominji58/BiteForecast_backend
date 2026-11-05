@@ -1,0 +1,529 @@
+{
+ "_note": "국립해양조사원 API 응답으로 확인한 관측소 목록 (2026-11-05 조회). has_* 는 조회 시점 최신값 존재 여부",
+ "tide": [
+  {
+   "code": "DT_0001",
+   "name": "인천",
+   "lat": 37.45194,
+   "lon": 126.59222
+  },
+  {
+   "code": "DT_0002",
+   "name": "평택",
+   "lat": 36.96694,
+   "lon": 126.82277
+  },
+  {
+   "code": "DT_0003",
+   "name": "영광",
+   "lat": 35.42611,
+   "lon": 126.42055
+  },
+  {
+   "code": "DT_0004",
+   "name": "제주",
+   "lat": 33.5275,
+   "lon": 126.54305
+  },
+  {
+   "code": "DT_0005",
+   "name": "부산",
+   "lat": 35.09638,
+   "lon": 129.03527
+  },
+  {
+   "code": "DT_0006",
+   "name": "묵호",
+   "lat": 37.55027,
+   "lon": 129.11638
+  },
+  {
+   "code": "DT_0007",
+   "name": "목포",
+   "lat": 34.77972,
+   "lon": 126.37555
+  },
+  {
+   "code": "DT_0008",
+   "name": "안산",
+   "lat": 37.19222,
+   "lon": 126.64722
+  },
+  {
+   "code": "DT_0010",
+   "name": "서귀포",
+   "lat": 33.24,
+   "lon": 126.56166
+  },
+  {
+   "code": "DT_0011",
+   "name": "후포",
+   "lat": 36.6775,
+   "lon": 129.45305
+  },
+  {
+   "code": "DT_0012",
+   "name": "속초",
+   "lat": 38.20722,
+   "lon": 128.59416
+  },
+  {
+   "code": "DT_0013",
+   "name": "울릉도",
+   "lat": 37.49138,
+   "lon": 130.91361
+  },
+  {
+   "code": "DT_0014",
+   "name": "통영",
+   "lat": 34.82777,
+   "lon": 128.43472
+  },
+  {
+   "code": "DT_0016",
+   "name": "여수",
+   "lat": 34.74722,
+   "lon": 127.76555
+  },
+  {
+   "code": "DT_0017",
+   "name": "대산",
+   "lat": 37.0075,
+   "lon": 126.35277
+  },
+  {
+   "code": "DT_0018",
+   "name": "군산",
+   "lat": 35.97555,
+   "lon": 126.56305
+  },
+  {
+   "code": "DT_0020",
+   "name": "울산",
+   "lat": 35.50194,
+   "lon": 129.38722
+  },
+  {
+   "code": "DT_0021",
+   "name": "추자도",
+   "lat": 33.96194,
+   "lon": 126.30027
+  },
+  {
+   "code": "DT_0022",
+   "name": "성산포",
+   "lat": 33.47472,
+   "lon": 126.92777
+  },
+  {
+   "code": "DT_0023",
+   "name": "모슬포",
+   "lat": 33.21444,
+   "lon": 126.25111
+  },
+  {
+   "code": "DT_0024",
+   "name": "장항",
+   "lat": 36.00694,
+   "lon": 126.6875
+  },
+  {
+   "code": "DT_0025",
+   "name": "보령",
+   "lat": 36.40638,
+   "lon": 126.48611
+  },
+  {
+   "code": "DT_0026",
+   "name": "고흥발포",
+   "lat": 34.48111,
+   "lon": 127.34277
+  },
+  {
+   "code": "DT_0027",
+   "name": "완도",
+   "lat": 34.31555,
+   "lon": 126.75972
+  },
+  {
+   "code": "DT_0028",
+   "name": "진도",
+   "lat": 34.37777,
+   "lon": 126.30861
+  },
+  {
+   "code": "DT_0029",
+   "name": "거제도",
+   "lat": 34.80138,
+   "lon": 128.69916
+  },
+  {
+   "code": "DT_0031",
+   "name": "거문도",
+   "lat": 34.02833,
+   "lon": 127.30888
+  },
+  {
+   "code": "DT_0032",
+   "name": "강화대교",
+   "lat": 37.73194,
+   "lon": 126.52222
+  },
+  {
+   "code": "DT_0035",
+   "name": "흑산도",
+   "lat": 34.68416,
+   "lon": 125.43555
+  },
+  {
+   "code": "DT_0036",
+   "name": "대청도",
+   "lat": 37.82522,
+   "lon": 124.71805
+  },
+  {
+   "code": "DT_0037",
+   "name": "어청도",
+   "lat": 36.11722,
+   "lon": 125.98472
+  },
+  {
+   "code": "DT_0038",
+   "name": "굴업도",
+   "lat": 37.19444,
+   "lon": 125.995
+  },
+  {
+   "code": "DT_0039",
+   "name": "왕돌초",
+   "lat": 36.71916,
+   "lon": 129.7325
+  },
+  {
+   "code": "DT_0041",
+   "name": "복사초",
+   "lat": 34.09833,
+   "lon": 126.16833
+  },
+  {
+   "code": "DT_0042",
+   "name": "교본초",
+   "lat": 34.70472,
+   "lon": 128.30638
+  },
+  {
+   "code": "DT_0043",
+   "name": "영흥도",
+   "lat": 37.23861,
+   "lon": 126.42861
+  },
+  {
+   "code": "DT_0044",
+   "name": "영종대교",
+   "lat": 37.54555,
+   "lon": 126.58444
+  },
+  {
+   "code": "DT_0046",
+   "name": "쌍정초",
+   "lat": 37.55616,
+   "lon": 130.93921
+  },
+  {
+   "code": "DT_0047",
+   "name": "도농탄",
+   "lat": 33.15805,
+   "lon": 126.27472
+  },
+  {
+   "code": "DT_0048",
+   "name": "속초등표",
+   "lat": 38.19947,
+   "lon": 128.61308
+  },
+  {
+   "code": "DT_0049",
+   "name": "광양",
+   "lat": 34.90367,
+   "lon": 127.75483
+  },
+  {
+   "code": "DT_0050",
+   "name": "태안",
+   "lat": 36.91305,
+   "lon": 126.23888
+  }
+ ],
+ "buoy": [
+  {
+   "code": "TW_0062",
+   "name": "해운대해수욕장",
+   "lat": 35.14897,
+   "lon": 129.17016,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0069",
+   "name": "대천해수욕장",
+   "lat": 36.27411,
+   "lon": 126.4578,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0070",
+   "name": "평택당진항",
+   "lat": 37.13666,
+   "lon": 126.54083,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0072",
+   "name": "군산항",
+   "lat": 35.98416,
+   "lon": 126.50875,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0074",
+   "name": "광양항",
+   "lat": 34.85972,
+   "lon": 127.79277,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0075",
+   "name": "중문해수욕장",
+   "lat": 33.2345,
+   "lon": 126.40955,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0076",
+   "name": "인천항",
+   "lat": 37.38944,
+   "lon": 126.53305,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0077",
+   "name": "경인항",
+   "lat": 37.52338,
+   "lon": 126.59208,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0078",
+   "name": "완도항",
+   "lat": 34.32508,
+   "lon": 126.76319,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0079",
+   "name": "상왕등도",
+   "lat": 35.65247,
+   "lon": 126.19425,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0080",
+   "name": "우이도",
+   "lat": 34.54305,
+   "lon": 125.80277,
+   "has_wave": true,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0081",
+   "name": "생일도",
+   "lat": 34.25872,
+   "lon": 126.96027,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0082",
+   "name": "태안항",
+   "lat": 37.00672,
+   "lon": 126.27022,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0083",
+   "name": "여수항",
+   "lat": 34.79472,
+   "lon": 127.80805,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0084",
+   "name": "통영항",
+   "lat": 34.77333,
+   "lon": 128.46,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0085",
+   "name": "마산항",
+   "lat": 35.10319,
+   "lon": 128.63183,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0086",
+   "name": "부산항신항",
+   "lat": 35.04377,
+   "lon": 128.76175,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0087",
+   "name": "부산항",
+   "lat": 35.09175,
+   "lon": 129.08525,
+   "has_wave": false,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0088",
+   "name": "감천항",
+   "lat": 35.0528,
+   "lon": 129.00308,
+   "has_wave": true,
+   "has_wind": false,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0089",
+   "name": "경포대해수욕장",
+   "lat": 37.80897,
+   "lon": 128.93188,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0090",
+   "name": "송정해수욕장",
+   "lat": 35.16472,
+   "lon": 129.21944,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0091",
+   "name": "낙산해수욕장",
+   "lat": 38.1225,
+   "lon": 128.65055,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0092",
+   "name": "임랑해수욕장",
+   "lat": 35.3025,
+   "lon": 129.2925,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0093",
+   "name": "속초해수욕장",
+   "lat": 38.19861,
+   "lon": 128.63138,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0094",
+   "name": "망상해수욕장",
+   "lat": 37.61611,
+   "lon": 129.10305,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "TW_0095",
+   "name": "고래불해수욕장",
+   "lat": 36.58,
+   "lon": 129.45408,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "KG_0021",
+   "name": "제주남부",
+   "lat": 32.09041,
+   "lon": 126.96586,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "KG_0024",
+   "name": "대한해협",
+   "lat": 34.919,
+   "lon": 129.12125,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "KG_0025",
+   "name": "남해동부",
+   "lat": 34.22247,
+   "lon": 128.41902,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  },
+  {
+   "code": "KG_0028",
+   "name": "제주해협",
+   "lat": 33.70011,
+   "lon": 126.5905,
+   "has_wave": true,
+   "has_wind": true,
+   "has_temp": true
+  }
+ ]
+}
