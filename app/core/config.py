@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     database_url: str = "sqlite:///./biteforecast.db"
 
-    khoa_api_key: str = ""
+    data_go_kr_api_key: str = ""
     kma_api_key: str = ""
 
     point_daily_cap: int = 0

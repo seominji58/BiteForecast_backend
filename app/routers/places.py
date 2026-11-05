@@ -3,10 +3,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import DbSession
-from app.models import Place, PlaceStation, Region
+from app.models import Place, PlaceStation, Region, Species
+from app.schemas.journal import SpeciesOut
 from app.schemas.place import PlaceDetailOut, PlaceOut, PlaceStationOut, RegionOut
 
 router = APIRouter(tags=["places"])
+
+
+@router.get("/species", response_model=list[SpeciesOut])
+def list_species(db: DbSession):
+    return db.scalars(select(Species).order_by(Species.name_ko)).all()
 
 
 @router.get("/regions", response_model=list[RegionOut])

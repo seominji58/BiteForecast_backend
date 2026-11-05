@@ -1,9 +1,9 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text
+from sqlalchemy import Date, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, TimestampMixin, str_enum
+from app.models.base import Base, TimestampMixin, UTCDateTime, str_enum
 from app.models.enums import RegulationStatus, ReportStatus, RestrictionType
 
 
@@ -28,7 +28,7 @@ class Restriction(Base):
     valid_to: Mapped[date | None] = mapped_column(Date)
     published_at: Mapped[date | None] = mapped_column(Date)
     verified_at: Mapped[date | None] = mapped_column(Date)
-    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_checked_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     update_state: Mapped[str | None] = mapped_column(String(20))  # ok / failed / revoked
     remarks: Mapped[str | None] = mapped_column(Text)
 

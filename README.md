@@ -11,7 +11,10 @@
 python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env
+cp .env.example .env   # DATA_GO_KR_API_KEY, KMA_API_KEY 입력
+
+# (선택) 개발용 샘플 해역·장소 추가 — 실제 해역(D-3) 확정 전 화면 개발용
+python -m seeds.dev_sample
 
 # 0.0.0.0 으로 열어야 같은 Wi-Fi 의 휴대폰(Expo Go)에서 접속 가능
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -19,6 +22,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 - API 문서: http://localhost:8000/docs
 - 헬스체크: `GET /api/v1/health`
+- DB 스키마가 바뀌면 `biteforecast.db`를 지우고 다시 실행한다 (Alembic 도입 전까지)
+
+| 환경변수 | 내용 |
+|---|---|
+| `DATA_GO_KR_API_KEY` | 공공데이터포털 인증키 (국립해양조사원 조석예보·조위관측소·해양관측부이) |
+| `KMA_API_KEY` | 기상청 API허브 인증키 (해양기상 예보·관측) |
 
 ## 테스트
 

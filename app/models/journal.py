@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin, str_enum, utcnow
+from app.models.base import Base, TimestampMixin, UTCDateTime, str_enum, utcnow
 from app.models.enums import DataKind, Metric
 
 
@@ -15,7 +15,7 @@ class Journal(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), index=True)
     place_id: Mapped[int] = mapped_column(ForeignKey("place.id"))
-    fished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fished_at: Mapped[datetime] = mapped_column(UTCDateTime())
     species_code: Mapped[str | None] = mapped_column(ForeignKey("species.code"))
     species_etc: Mapped[str | None] = mapped_column(String(50))
     count: Mapped[int | None] = mapped_column(Integer)
@@ -23,11 +23,14 @@ class Journal(TimestampMixin, Base):
     bait: Mapped[str | None] = mapped_column(String(50))
     rig: Mapped[str | None] = mapped_column(String(50))
     memo: Mapped[str | None] = mapped_column(Text)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
+    place: Mapped["Place"] = relationship()  # noqa: F821
     photos: Mapped[list["JournalPhoto"]] = relationship(back_populates="journal")
-    env_snapshots: Mapped[list["JournalEnvSnapshot"]] = relationship(back_populates="journal")
+    env_snapshots: Mapped[list["JournalEnvSnapshot"]] = relationship(
+        back_populates="journal", cascade="all, delete-orphan"
+    )
 
 
 class JournalPhoto(TimestampMixin, Base):
@@ -40,7 +43,7 @@ class JournalPhoto(TimestampMixin, Base):
     path: Mapped[str] = mapped_column(String(255))
     width: Mapped[int | None] = mapped_column(Integer)
     height: Mapped[int | None] = mapped_column(Integer)
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     journal: Mapped[Journal] = relationship(back_populates="photos")
 
@@ -53,13 +56,13 @@ class JournalEnvSnapshot(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     journal_id: Mapped[int] = mapped_column(ForeignKey("journal.id", ondelete="CASCADE"), index=True)
     metric: Mapped[Metric] = mapped_column(str_enum(Metric))
-    kind: Mapped[DataKind] = mapped_column(str_enum(DataKind))
+    kind: Mapped[DataKind | None] = mapped_column(str_enum(DataKind))  # None = 연결된 자료 없음
     value: Mapped[float | None] = mapped_column(Float)
     unit: Mapped[str] = mapped_column(String(10))
-    value_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    value_time: Mapped[datetime | None] = mapped_column(UTCDateTime())
     station_id: Mapped[int | None] = mapped_column(ForeignKey("station.id"))
     distance_km: Mapped[float | None] = mapped_column(Float)
     source_agency: Mapped[str | None] = mapped_column(String(50))
-    linked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    linked_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
 
     journal: Mapped[Journal] = relationship(back_populates="env_snapshots")

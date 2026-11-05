@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
 from app.core.db import init_db
-from app.routers import health, me, places
+from app.routers import health, journals, me, places
 
 API_PREFIX = "/api/v1"
 
@@ -46,18 +46,30 @@ async def http_exception_handler(_req: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_req: Request, exc: RequestValidationError):
+    # errors() 의 ctx 에는 JSON 직렬화가 안 되는 예외 객체가 들어 있을 수 있어 필요한 필드만 내보낸다
+    details = [
+        {"loc": list(e.get("loc", ())), "msg": _clean_msg(e.get("msg", "")), "type": e.get("type")}
+        for e in exc.errors()
+    ]
     return JSONResponse(
         status_code=422,
         content={
             "error": {
                 "code": "VALIDATION_ERROR",
-                "message": "요청 값이 올바르지 않습니다",
-                "details": exc.errors(),
+                "message": details[0]["msg"] if details else "요청 값이 올바르지 않습니다",
+                "details": details,
             }
         },
     )
 
 
+def _clean_msg(msg: str) -> str:
+    # pydantic 이 붙이는 "Value error, " 접두어 제거 → 앱에 그대로 표시 가능한 한국어 메시지
+    return msg.removeprefix("Value error, ")
+
+
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(places.router, prefix=API_PREFIX)
 app.include_router(me.router, prefix=API_PREFIX)
+
+app.include_router(journals.router, prefix=API_PREFIX)
