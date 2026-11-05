@@ -52,6 +52,13 @@ def sources():
             agency="기상청", dataset="단기예보 (파고·풍속)", kind=DataKind.FORECAST, connected=True
         ),
         DataSourceOut(
+            agency="기상청",
+            dataset="기상특보 현황 (풍랑·폭풍해일·태풍 등)",
+            kind=DataKind.OBSERVED,
+            connected=True,
+            note="발표 원문의 구역명 기준으로 장소의 바다에 해당하는 특보를 표시",
+        ),
+        DataSourceOut(
             agency="지방자치단체 (공공데이터포털)",
             dataset="전국낚시터정보표준데이터 (낚시터 위치·요금·시설)",
             kind=DataKind.OBSERVED,

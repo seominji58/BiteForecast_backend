@@ -5,6 +5,7 @@
 - 부이 실측: 오늘-N ~ 오늘 (미래 실측은 없음)
 - 기상청 단기예보(파고·풍속): 최신 발표분 (약 5일)
 - 바다낚시지수: 오늘부터 약 7일 (전국 응답 중 매핑된 지점만 저장)
+- 기상청 특보 현황: 매 실행 (전국 1건)
 같은 관측소·날짜는 지우고 다시 넣는다 (최신 조회 결과로 교체).
 수집 후, 해당 기간에 출조한 일지의 환경정보 스냅샷을 다시 연결한다 (FR-10).
 
@@ -14,9 +15,11 @@
 """
 
 import argparse
+import json
 import logging
 import time
 from collections import Counter
+from dataclasses import asdict
 from datetime import date, timedelta
 
 from sqlalchemy import delete, func, select
@@ -24,10 +27,20 @@ from sqlalchemy.orm import Session
 
 from app.clients.khoa import BuoyRow, KhoaError
 from app.clients.kma import KmaForecastClient, latest_base_time
+from app.clients.kma_warning import KmaWarningClient
 from app.core.config import get_settings
 from app.core.db import SessionLocal, init_db
 from app.core.timeutil import kst_day_range, today_kst
-from app.models import FishingIndex, Journal, OceanReading, PlaceStation, Station, TideExtreme, TideForecast
+from app.models import (
+    FishingIndex,
+    Journal,
+    MarineWarningSnapshot,
+    OceanReading,
+    PlaceStation,
+    Station,
+    TideExtreme,
+    TideForecast,
+)
 from app.models.base import utcnow
 from app.models.enums import DataKind, Metric, StationRole
 from app.services.envlink import link_environment
@@ -79,6 +92,9 @@ def collect_once(client: KmaForecastClient | None = None) -> Counter:
                 db.commit()
 
             _collect_fishing_index(db, client, today, _mapped_stations(db, StationRole.FISHING_INDEX), stats)
+            db.commit()
+
+            _collect_warnings(db, client, stats)
             db.commit()
 
             # 일지 환경정보 재연결 (수집 기간에 출조한 일지)
@@ -312,6 +328,33 @@ def _collect_fishing_index(db, client, today: date, stations: list[Station], sta
             )
         )
     stats["fishing_index_rows"] += len(seen)
+
+
+def _collect_warnings(db, client, stats: Counter) -> None:
+    """기상청 특보 현황. 전국 1건이라 매 실행 받는다 (특보는 수시 발표)"""
+    try:
+        st = KmaWarningClient(api_key=client.api_key, http=client.http).status()
+    except KhoaError as e:
+        log.error("특보 현황 수집 실패: %s", e)
+        stats["warning_errors"] += 1
+        return
+    db.add(
+        MarineWarningSnapshot(
+            issued_at=st.issued_at,
+            fetched_at=utcnow(),
+            active_json=json.dumps([asdict(w) for w in st.active], ensure_ascii=False),
+            preliminary_json=json.dumps([asdict(p) for p in st.preliminary], ensure_ascii=False),
+            raw_active=st.raw_active,
+            raw_preliminary=st.raw_preliminary,
+        )
+    )
+    # 오래된 스냅샷 정리 (최근 48개만 유지)
+    old = db.scalars(
+        select(MarineWarningSnapshot.id).order_by(MarineWarningSnapshot.fetched_at.desc()).offset(48)
+    ).all()
+    if old:
+        db.execute(delete(MarineWarningSnapshot).where(MarineWarningSnapshot.id.in_(old)))
+    stats["warning_snapshots"] += 1
 
 
 def _handle_error(e: KhoaError, dataset: str, st: Station, day: date, stats: Counter, disabled: set) -> None:

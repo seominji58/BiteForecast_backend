@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, Float, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Date, Float, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UTCDateTime
@@ -30,3 +30,17 @@ class FishingIndex(Base):
     min_wind_ms: Mapped[float | None] = mapped_column(Float)
     max_wind_ms: Mapped[float | None] = mapped_column(Float)
     fetched_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class MarineWarningSnapshot(Base):
+    """기상청 특보 현황 스냅샷 (전국 1건). 파싱 결과와 원문을 함께 보관"""
+
+    __tablename__ = "marine_warning_snapshot"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    issued_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+    active_json: Mapped[str] = mapped_column(Text)  # [{type, areas[]}]
+    preliminary_json: Mapped[str] = mapped_column(Text)  # [{type, when, areas[]}]
+    raw_active: Mapped[str] = mapped_column(Text)
+    raw_preliminary: Mapped[str] = mapped_column(Text)

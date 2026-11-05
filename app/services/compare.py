@@ -42,6 +42,7 @@ from app.schemas.compare import (
 )
 from app.schemas.place import PlaceOut
 from app.services.regulation import evaluate
+from app.services.warning import evaluate as evaluate_warning
 
 DISCLAIMER = (
     "실제 입질·조과를 보장하지 않으며, 관측소 값은 낚시 장소의 현장 조건과 다를 수 있습니다. "
@@ -248,6 +249,7 @@ def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
         place=PlaceOut.model_validate(place),
         region_name=place.region.name,
         regulation=evaluate(db, place.id, day),
+        warning=evaluate_warning(db, place),
         fishing_index=_fishing_index(db, by_role.get(StationRole.FISHING_INDEX), day),
         series=series,
     )

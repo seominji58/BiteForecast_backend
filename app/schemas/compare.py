@@ -91,10 +91,31 @@ class FishingIndexOut(BaseModel):
     periods: list[FishingPeriodOut] | None = None
 
 
+class WarningMatchOut(BaseModel):
+    type: str  # 예: 풍랑주의보 / 풍랑 예비특보
+    areas: list[str]  # 이 장소의 바다에 해당하는 구역만
+    when: str | None  # 예비특보의 예상 시각
+    severe: bool  # 앞바다·도 단위 해상특보, 또는 선상 포인트의 먼바다 해상특보
+
+
+class WarningOut(BaseModel):
+    """기상청 해상 특보 (공식 발표). level=unknown 이면 「특보 없음」으로 표시하지 않는다"""
+
+    level: Literal["warning", "nearby", "preliminary", "none", "unknown"]
+    reason: Literal["NO_DATA", "UNKNOWN_SEA"] | None = None
+    seas: list[str] = []  # 이 장소에 적용한 바다 (예: 서해중부)
+    active: list[WarningMatchOut] = []
+    preliminary: list[WarningMatchOut] = []
+    issued_at: datetime | None = None
+    fetched_at: datetime | None = None
+    source: str = "기상청 기상특보"
+
+
 class PlaceCompareOut(BaseModel):
     place: PlaceOut
     region_name: str
     regulation: RegulationOut
+    warning: WarningOut
     fishing_index: FishingIndexOut
     series: list[SeriesOut]
 
