@@ -61,25 +61,36 @@ def link_environment(db: Session, journal: Journal) -> None:
         _snapshot(Metric.TIDE_LEVEL, "cm", tide_ps, tide_row, tide_row.level_cm if tide_row else None)
     )
 
-    # 파고·풍속·수온: 실측 우선, 없으면 예보
+    # 파고·풍속·수온: 부이 실측 우선, 없으면 기상청 예보 격자
     ocean_ps = mappings.get(StationRole.OCEAN)
+    forecast_ps = mappings.get(StationRole.FORECAST)
     for metric, unit in OCEAN_METRICS:
-        row = None
-        if ocean_ps:
-            rows = db.scalars(
-                select(OceanReading).where(
-                    OceanReading.station_id == ocean_ps.station_id,
-                    OceanReading.metric == metric,
-                    OceanReading.t.between(lo, hi),
-                    OceanReading.value.is_not(None),
-                )
-            ).all()
-            row = _nearest([r for r in rows if r.kind == DataKind.OBSERVED], t) or _nearest(
-                [r for r in rows if r.kind == DataKind.FORECAST], t
-            )
-        journal.env_snapshots.append(_snapshot(metric, unit, ocean_ps, row, row.value if row else None))
+        used_ps, row = ocean_ps, _nearest(_readings(db, ocean_ps, metric, DataKind.OBSERVED, lo, hi), t)
+        if row is None and forecast_ps is not None:
+            fc = _nearest(_readings(db, forecast_ps, metric, DataKind.FORECAST, lo, hi), t)
+            if fc is not None:
+                used_ps, row = forecast_ps, fc
+        journal.env_snapshots.append(_snapshot(metric, unit, used_ps, row, row.value if row else None))
 
     db.flush()
+
+
+def _readings(
+    db: Session, ps: PlaceStation | None, metric: Metric, kind: DataKind, lo, hi
+) -> list[OceanReading]:
+    if ps is None:
+        return []
+    return list(
+        db.scalars(
+            select(OceanReading).where(
+                OceanReading.station_id == ps.station_id,
+                OceanReading.metric == metric,
+                OceanReading.kind == kind,
+                OceanReading.t.between(lo, hi),
+                OceanReading.value.is_not(None),
+            )
+        ).all()
+    )
 
 
 def _snapshot(

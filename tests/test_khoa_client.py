@@ -97,3 +97,23 @@ def test_not_registered_error_even_with_403():
     with pytest.raises(KhoaError) as e:
         client_with(403, NOT_REGISTERED).tide_hourly("DT_0018", date(2026, 11, 5))
     assert e.value.not_registered
+
+
+# 2026-11-05 실제 응답 (속초)
+TIDE_HOURLY_OK = {
+    "header": {"resultCode": "00", "resultMsg": "NORMAL_SERVICE"},
+    "body": {
+        "items": {
+            "item": [
+                {"obsvtrNm": "속초", "predcDt": "2026-11-05 01:00", "tdlvHgt": 21.99},
+                {"obsvtrNm": "속초", "predcDt": "2026-11-05 00:00", "tdlvHgt": 21.71},
+            ]
+        }
+    },
+}
+
+
+def test_tide_hourly_parsed():
+    rows = client_with(200, TIDE_HOURLY_OK).tide_hourly("DT_0012", date(2026, 11, 5))
+    assert [r.t.hour for r in rows] == [0, 1]
+    assert rows[0].level_cm == 21.71

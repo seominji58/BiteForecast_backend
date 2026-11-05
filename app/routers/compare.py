@@ -32,19 +32,11 @@ def sources():
             agency=AGENCY, dataset=DATASET_NAMES[EP_TIDE_EXTREME], kind=DataKind.FORECAST, connected=True
         ),
         DataSourceOut(
-            agency=AGENCY,
-            dataset=DATASET_NAMES[EP_TIDE_HOURLY],
-            kind=DataKind.FORECAST,
-            connected=False,
-            note="공공데이터포털 활용신청 후 연결",
+            agency=AGENCY, dataset=DATASET_NAMES[EP_TIDE_HOURLY], kind=DataKind.FORECAST, connected=True
         ),
         DataSourceOut(agency=AGENCY, dataset=DATASET_NAMES[EP_BUOY], kind=DataKind.OBSERVED, connected=True),
         DataSourceOut(
-            agency="기상청",
-            dataset="단기예보 (파고·풍속)",
-            kind=DataKind.FORECAST,
-            connected=False,
-            note="기상청 API허브 활용신청 후 연결",
+            agency="기상청", dataset="단기예보 (파고·풍속)", kind=DataKind.FORECAST, connected=True
         ),
     ]
 

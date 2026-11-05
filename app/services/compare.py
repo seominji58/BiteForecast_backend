@@ -13,6 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.clients.khoa import AGENCY, DATASET_NAMES, EP_BUOY, EP_TIDE_EXTREME, EP_TIDE_HOURLY
+from app.clients.kma import AGENCY as KMA_AGENCY
+from app.clients.kma import DATASET as KMA_DATASET
 from app.core.config import get_settings
 from app.core.timeutil import kst_day_range, today_kst
 from app.models import OceanReading, Place, PlaceStation, TideExtreme, TideForecast
@@ -40,7 +42,7 @@ OCEAN_METRICS: list[tuple[Metric, str]] = [
     (Metric.WIND_SPEED, "m/s"),
     (Metric.WATER_TEMP, "°C"),
 ]
-# 파고·풍속 예보 출처(기상청)는 아직 미연결 → 미래 날짜에는 「자료 없음」
+# 기상청 단기예보로 예보를 제공하는 지표
 FORECAST_METRICS = {Metric.WAVE_HEIGHT, Metric.WIND_SPEED}
 
 
@@ -89,6 +91,42 @@ def _source(ps: PlaceStation, endpoint: str) -> SourceOut:
         station_code=ps.station.external_id,
         station_name=ps.station.name,
         distance_km=ps.distance_km,
+    )
+
+
+def _forecast_series(db: Session, ps: PlaceStation | None, metric: Metric, unit: str, lo, hi) -> SeriesOut:
+    if ps is None:
+        return _unavailable(metric.value, unit, DataKind.FORECAST, "NO_STATION")
+    source = SourceOut(
+        agency=KMA_AGENCY,
+        dataset=KMA_DATASET,
+        station_code=ps.station.external_id,
+        station_name=ps.station.name,
+        distance_km=ps.distance_km,
+    )
+    rows = db.scalars(
+        select(OceanReading)
+        .where(
+            OceanReading.station_id == ps.station_id,
+            OceanReading.metric == metric,
+            OceanReading.kind == DataKind.FORECAST,
+            OceanReading.t >= lo,
+            OceanReading.t < hi,
+        )
+        .order_by(OceanReading.t)
+    ).all()
+    if not rows:
+        # 단기예보는 약 5일치만 제공 → 그 이후 날짜는 자료 없음
+        return _unavailable(metric.value, unit, DataKind.FORECAST, "NO_DATA", source)
+    return SeriesOut(
+        metric=metric.value,
+        unit=unit,
+        kind=DataKind.FORECAST,
+        status="ok",
+        source=source,
+        issued_at=max(r.issued_at for r in rows),
+        fetched_at=max(r.fetched_at for r in rows),
+        points=[PointOut(t=r.t, v=r.value) for r in rows],
     )
 
 
@@ -178,9 +216,9 @@ def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
                 )
             )
 
-        # 예보: 출처 미연결 (기상청 API 활용신청 후 연결)
+        # 예보: 기상청 단기예보 격자 (실측 부이와 같은 위치). 실측과 별도 계열로 내보낸다 (TC-03)
         if metric in FORECAST_METRICS:
-            series.append(_unavailable(metric.value, unit, DataKind.FORECAST, "NOT_CONNECTED"))
+            series.append(_forecast_series(db, by_role.get(StationRole.FORECAST), metric, unit, lo, hi))
 
     return PlaceCompareOut(
         place=PlaceOut.model_validate(place),

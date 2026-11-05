@@ -50,6 +50,23 @@ def setup(client):
                 ),
             ]
         )
+        # 장소 A 에만 기상청 예보 격자 매핑. 내일 06시 파고 예보 1.0m
+        grid = Station(provider="KMA", external_id="1,1", name="테스트 예보격자", kind=StationKind.KMA)
+        db.add(grid)
+        db.flush()
+        db.add(PlaceStation(place_id=a.id, role=StationRole.FORECAST, station_id=grid.id, distance_km=2.0))
+        db.add(
+            OceanReading(
+                station_id=grid.id,
+                metric=Metric.WAVE_HEIGHT,
+                kind=DataKind.FORECAST,
+                t=lo + timedelta(days=1, hours=6),
+                value=1.0,
+                unit="m",
+                issued_at=now,
+                fetched_at=now,
+            )
+        )
         # 오늘 00시 실측: 파고 값 있음, 01시: 파고 결측(None), 02시: 파고 0.0 (실제 0)
         for h, v in [(0, 0.5), (1, None), (2, 0.0)]:
             db.add(
@@ -103,7 +120,21 @@ def test_forecast_and_observed_are_separate_series(client, setup):
     ).json()["places"][0]
     kinds = [s["kind"] for s in a["series"] if s["metric"] == "wave_height"]
     assert sorted(kinds) == ["forecast", "observed"]
-    assert series(a, "wave_height", "forecast")["reason"] == "NOT_CONNECTED"
+    # 오늘은 예보 자료가 없음(내일 것만 있음) → 실측 값이 예보 계열로 섞이지 않는다
+    assert series(a, "wave_height", "forecast")["reason"] == "NO_DATA"
+
+
+def test_future_date_uses_kma_forecast(client, setup):
+    tomorrow = setup["today"] + timedelta(days=1)
+    a, b = client.get(
+        URL, params={"place_a": setup["a"], "place_b": setup["b"], "date": str(tomorrow)}
+    ).json()["places"]
+    fc = series(a, "wave_height", "forecast")
+    assert fc["status"] == "ok" and [p["v"] for p in fc["points"]] == [1.0]
+    assert fc["source"]["agency"] == "기상청" and fc["source"]["distance_km"] == 2.0
+    assert series(a, "wave_height", "observed")["reason"] == "FUTURE_DATE"
+    # 예보 격자가 매핑되지 않은 장소
+    assert series(b, "wave_height", "forecast")["reason"] == "NO_STATION"
 
 
 def test_future_date_has_no_observed(client, setup):

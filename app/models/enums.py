@@ -16,8 +16,9 @@ class StationKind(StrEnum):
 
 
 class StationRole(StrEnum):
-    TIDE = "tide"
-    OCEAN = "ocean"
+    TIDE = "tide"  # 조석 예보지점
+    OCEAN = "ocean"  # 해양관측 부이 (실측)
+    FORECAST = "forecast"  # 기상청 단기예보 격자 (파고·풍속 예보)
 
 
 class DataKind(StrEnum):

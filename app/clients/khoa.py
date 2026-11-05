@@ -4,7 +4,7 @@
 - 조석예보(고·저조)      tideFcstHghLw/GetTideFcstHghLwApiService   obsCode=DT_xxxx, reqDate
 - 해양관측부이 최신관측   twRecent/GetTWRecentApiService            obsCode=TW_xxxx, reqDate, min
 - 조석예보(시계열)        tideFcstTime/GetTideFcstTimeApiService      obsCode=DT_xxxx, reqDate, min
-  → 활용신청 전이라 응답 필드 미검증. 신청 후 _parse_tide_hourly 확인 필요
+  → 응답 필드 predcDt, tdlvHgt(cm)
 
 공통 규칙
 - 값이 없으면 None (0 으로 채우지 않음)
@@ -102,14 +102,18 @@ class KhoaClient:
         self.http.close()
 
     def _get(self, endpoint: str, params: dict) -> list[dict]:
-        q = {"serviceKey": self.api_key, "type": "json", "pageNo": 1, "numOfRows": 300, **params}
+        return self._request(f"{BASE_URL}/{endpoint}", {"type": "json", "numOfRows": 300, **params})
+
+    def _request(self, url: str, params: dict) -> list[dict]:
+        """공공데이터포털 공통 호출 (호출 간격, 429·네트워크 재시도, 오류 형식 해석)"""
+        q = {"serviceKey": self.api_key, "pageNo": 1, **params}
         for attempt in range(self.retries + 1):
             wait = self.min_interval - (_time.monotonic() - self._last_call)
             if wait > 0:
                 _time.sleep(wait)
             self._last_call = _time.monotonic()
             try:
-                res = self.http.get(f"{BASE_URL}/{endpoint}", params=q)
+                res = self.http.get(url, params=q)
             except httpx.HTTPError as e:
                 if attempt < self.retries:
                     _time.sleep(1 + attempt)
@@ -141,7 +145,13 @@ class KhoaClient:
         if res.status_code != 200:
             raise KhoaError(str(res.status_code), res.text[:200])
 
+        # 기상청 API 는 {"response": {"header", "body"}} 로 한 번 더 감싸서 보낸다
+        if isinstance(data.get("response"), dict):
+            data = data["response"]
+
         header = data.get("header", {})
+        if header.get("resultCode") == "03":  # NO_DATA
+            return []
         if header.get("resultCode") not in ("00", None):
             raise KhoaError(str(header.get("resultCode")), header.get("resultMsg", ""))
 
@@ -189,14 +199,12 @@ class KhoaClient:
 
 
 def _parse_tide_hourly(items: list[dict]) -> list[TideLevelRow]:
-    """필드명 미검증: 고·저조 API 와 같은 predcDt / predcTdlvVl 을 우선 가정하고 후보를 순서대로 찾는다"""
-    rows = []
-    for i in items:
-        ts = i.get("predcDt") or i.get("obsrvnDt")
-        if not ts:
-            continue
-        val = next((i[k] for k in ("predcTdlvVl", "tdlvHgt", "bscTdlvHgt", "tideLevel") if k in i), None)
-        rows.append(TideLevelRow(t=parse_kst(ts), level_cm=_num(val)))
+    """응답 필드: predcDt(예측 시각, KST), tdlvHgt(조위 cm) — 2026-11-05 실제 응답으로 확인"""
+    rows = [
+        TideLevelRow(t=parse_kst(i["predcDt"]), level_cm=_num(i.get("tdlvHgt")))
+        for i in items
+        if i.get("predcDt")
+    ]
     if items and not rows:
         log.warning("조석예보(시계열) 응답 필드를 해석하지 못했습니다: %s", list(items[0].keys()))
     return sorted(rows, key=lambda r: r.t)
