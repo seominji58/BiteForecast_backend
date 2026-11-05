@@ -285,3 +285,33 @@ def test_fishing_index_refetches_when_new_station_mapped(client):
         assert FakeClient.calls == 1
         _collect_fishing_index(db, FakeClient(), today, [old, new], stats)  # 이제 모두 있음 → 건너뜀
         assert FakeClient.calls == 1 and stats["fishing_index_skipped"] == 1
+
+
+def test_fishing_index_species_dash_shown_as_common(client):
+    """어종 구분 없이 「-」로만 발표된 지점도 지수를 보여준다 (빈 카드 방지)"""
+    from app.models import FishingIndex
+
+    today = today_kst()
+    with SessionLocal() as db:
+        region = Region(name="공통지수 테스트")
+        place = Place(name="선상포인트", lat=37.0, lon=129.0)
+        region.places = [place]
+        st = Station(provider="KHOA", external_id="선상지점", name="선상지점", kind=StationKind.FISHING_INDEX)
+        db.add_all([region, st])
+        db.flush()
+        db.add(
+            PlaceStation(place_id=place.id, role=StationRole.FISHING_INDEX, station_id=st.id, distance_km=0.0)
+        )
+        db.add(
+            FishingIndex(
+                station_id=st.id, day=today, period="오후", species="-", index="보통", fetched_at=utcnow()
+            )
+        )
+        db.commit()
+        pid = place.id
+
+    f = client.get(f"/api/v1/places/{pid}/conditions", params={"date": str(today)}).json()["place"][
+        "fishing_index"
+    ]
+    assert f["status"] == "ok"
+    assert f["periods"][0]["items"] == [{"species": "어종 공통", "index": "보통"}]

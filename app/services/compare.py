@@ -255,6 +255,8 @@ def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
 
 _PERIOD_ORDER = {"오전": 0, "오후": 1, "일": 2}
 _SPECIES_LAST = {"기타어종", "-"}
+# 일부 지점(선상 등)은 어종 구분 없이 「-」로 지수를 발표한다 → 버리지 않고 「어종 공통」으로 표시
+SPECIES_COMMON = "어종 공통"
 
 
 def _fishing_index(db: Session, ps: PlaceStation | None, day: date) -> FishingIndexOut:
@@ -283,9 +285,10 @@ def _fishing_index(db: Session, ps: PlaceStation | None, day: date) -> FishingIn
                 period=period,
                 tide_phase=next((r.tide_phase for r in items if r.tide_phase), None),
                 items=[
-                    FishingSpeciesOut(species=r.species, index=r.index)
+                    FishingSpeciesOut(
+                        species=SPECIES_COMMON if r.species == "-" else r.species, index=r.index
+                    )
                     for r in sorted(items, key=lambda r: (r.species in _SPECIES_LAST, r.species))
-                    if r.species != "-"
                 ],
             )
             for period, items in sorted(periods.items(), key=lambda kv: _PERIOD_ORDER.get(kv[0], 9))
