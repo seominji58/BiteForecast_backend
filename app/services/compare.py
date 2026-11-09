@@ -41,8 +41,7 @@ from app.schemas.compare import (
     SourceOut,
     WarningOut,
 )
-from app.schemas.place import PlaceOut
-from app.services.location import same_sea, suspect_place_ids
+from app.services.location import place_out, same_sea, suspect_place_ids
 from app.services.regulation import evaluate
 from app.services.warning import evaluate as evaluate_warning
 
@@ -168,7 +167,7 @@ def _location_check_out(db: Session, place: Place, day: date) -> PlaceCompareOut
         series.append(_unavailable(metric.value, unit, DataKind.OBSERVED, reason))
         if metric in FORECAST_METRICS:
             series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
-    out = PlaceOut.model_validate(place)
+    out = place_out(db, place)
     out.location_suspect = True
     return PlaceCompareOut(
         place=out,
@@ -285,7 +284,7 @@ def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
             series.append(_forecast_series(db, by_role.get(StationRole.FORECAST), metric, unit, lo, hi))
 
     return PlaceCompareOut(
-        place=PlaceOut.model_validate(place),
+        place=place_out(db, place),
         region_name=place.region.name,
         regulation=evaluate(db, place.id, day),
         warning=evaluate_warning(db, place),

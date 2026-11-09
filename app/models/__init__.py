@@ -1,5 +1,6 @@
 from app.models.base import Base
 from app.models.community import Comment, ContentReport, Post, PostLike
+from app.models.coord import PlaceCoordCheck
 from app.models.fishing import FishingIndex, MarineWarningSnapshot
 from app.models.journal import Journal, JournalEnvSnapshot
 from app.models.ocean import OceanReading, TideExtreme, TideForecast
@@ -25,6 +26,7 @@ __all__ = [
     "OceanReading",
     "Photo",
     "Place",
+    "PlaceCoordCheck",
     "PlaceInfo",
     "PlaceStation",
     "PointLedger",

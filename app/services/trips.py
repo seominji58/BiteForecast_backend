@@ -36,7 +36,7 @@ from app.schemas.trip import (
 )
 from app.services import compare as compare_svc
 from app.services.freshness import data_status
-from app.services.location import suspect_place_ids
+from app.services.location import coord_states, suspect_place_ids
 from app.services.summary import summarize_place
 
 DEFAULT_CHECKLIST = ["낚싯대·릴·채비", "미끼·보냉 장비", "구명조끼", "출발 전 기상특보 재확인"]
@@ -77,8 +77,12 @@ def _journal_ids(db: Session, stop_ids: list[int]) -> dict[int, list[int]]:
     return out
 
 
-def _stop_out(s: TripStop, suspects: frozenset[int], journals: dict[int, list[int]]) -> TripStopOut:
-    place = PlaceOut.model_validate(s.place).model_copy(update={"location_suspect": s.place_id in suspects})
+def _stop_out(
+    s: TripStop, suspects: frozenset[int], journals: dict[int, list[int]], coords: dict | None = None
+) -> TripStopOut:
+    place = PlaceOut.model_validate(s.place).model_copy(
+        update={"location_suspect": s.place_id in suspects, "coord": (coords or {}).get(s.place_id)}
+    )
     return TripStopOut(
         id=s.id,
         day=s.day,
@@ -106,7 +110,7 @@ def to_out(db: Session, t: TripPlan) -> TripOut:
         species_name=species.name_ko if species else None,
         species_etc=t.species_etc,
         memo=t.memo,
-        stops=[_stop_out(s, suspects, journals) for s in t.stops],
+        stops=[_stop_out(s, suspects, journals, coord_states(db)) for s in t.stops],
         checklist=[ChecklistItemOut.model_validate(c) for c in t.checklist],
         created_at=t.created_at,
         updated_at=t.updated_at,
@@ -145,7 +149,7 @@ def list_trips(db: Session, user: AppUser, when: str) -> list[TripListItemOut]:
             checklist_done=sum(c.checked for c in t.checklist),
             checklist_total=len(t.checklist),
             journal_count=sum(len(journals.get(s.id, [])) for s in t.stops),
-            first_stop=_stop_out(t.stops[0], suspects, journals) if t.stops else None,
+            first_stop=_stop_out(t.stops[0], suspects, journals, coord_states(db)) if t.stops else None,
         )
         for t in plans
     ]

@@ -1,0 +1,109 @@
+"""좌표 검증 기록 (보고서 docs/03_데이터/2026-11-09_좌표품질_검증보고서.md 단계 0·1)"""
+
+from datetime import UTC, datetime, timedelta
+
+import pytest
+from sqlalchemy import func, select
+
+from app.core.db import SessionLocal
+from app.core.timeutil import today_kst
+from app.models import Place, PlaceCoordCheck, Region
+from app.services import summary as summary_service
+from app.services.coord_checks import RegisterError, register_from_audit, rollback
+
+
+@pytest.fixture()
+def place(client) -> int:
+    with SessionLocal() as db:
+        r = Region(name="경남 좌표검사시")
+        r.places = [Place(name="좌표 검사 좌대", lat=35.04, lon=128.38)]
+        db.add(r)
+        db.commit()
+        return r.places[0].id
+
+
+def _check(pid: int, grade: str, sub=None, loc="unknown", when=None, batch="t"):
+    with SessionLocal() as db:
+        db.add(
+            PlaceCoordCheck(
+                place_id=pid,
+                grade=grade,
+                sub_grade=sub,
+                location_type=loc,
+                status="unverified",
+                method="manual",
+                evidence="테스트",
+                batch=batch,
+                checked_at=when or datetime.now(UTC),
+            )
+        )
+        db.commit()
+
+
+def _api_place(client, pid):
+    return next(p for p in client.get("/api/v1/places").json() if p["id"] == pid)
+
+
+def test_no_record_means_not_judged(client, place):
+    p = _api_place(client, place)
+    assert p["coord"] is None and p["location_suspect"] is False
+
+
+def test_latest_record_wins_and_history_kept(client, place):
+    _check(place, "C", "C2", "business_address", when=datetime.now(UTC) - timedelta(days=1))
+    p = _api_place(client, place)
+    assert p["coord"]["grade"] == "C" and p["coord"]["approx"] is True
+    assert "대략 위치" in p["coord"]["label"] and p["location_suspect"] is False
+    # 새 기록(D)을 더하면 현재 상태가 바뀌고, 이전 기록은 남는다
+    _check(place, "D", None, "unverifiable")
+    p = _api_place(client, place)
+    assert p["coord"]["grade"] == "D" and p["location_suspect"] is True
+    detail = client.get(f"/api/v1/places/{place}").json()
+    assert detail["location_suspect"] is True and detail["coord"]["label"] == "위치 확인 필요"
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count(PlaceCoordCheck.id)).where(PlaceCoordCheck.place_id == place)) == 2
+        # 원본 좌표는 그대로
+        assert (db.get(Place, place).lat, db.get(Place, place).lon) == (35.04, 128.38)
+
+    # D 등급: 해황 연결·요약에서 위치 확인 필요로 처리 (자료를 정상처럼 보여주지 않음)
+    day = str(today_kst())
+    pc = client.get(f"/api/v1/places/{place}/conditions", params={"date": day}).json()["place"]
+    assert pc["warning"]["reason"] == "LOCATION_CHECK"
+    assert all(s["status"] == "unavailable" for s in pc["series"])
+    summary_service._cache.clear()
+    s = next(
+        x for x in client.get(f"/api/v1/places-summary?date={day}").json()["places"] if x["place_id"] == place
+    )
+    assert s["location_suspect"] is True and s["wave_fc_max"] is None
+
+
+def test_register_and_rollback(client, place):
+    row = {
+        "id": str(place),
+        "등급": "C",
+        "세부": "C2 정밀도 부족(대략·공유 좌표)",
+        "좌표의미": "사업장·어촌계 대표 주소(추정)",
+        "근거": "17곳이 같은 주소·같은 좌표",
+        "실질정밀도": "소수 2자리",
+        "위도(원문)": "35.04",
+        "경도(원문)": "128.38",
+        "같은좌표곳수": "17",
+        "같은좌표·같은주소": "예",
+        "우선검토 사유": "",
+        "행정구역 대리점검": "",
+    }
+    with SessionLocal() as db:
+        assert register_from_audit(db, [row], "audit-test") == 1
+        with pytest.raises(RegisterError):
+            register_from_audit(db, [row], "audit-test")  # 같은 batch 중복 등록 거부
+        with pytest.raises(RegisterError):
+            register_from_audit(db, [{**row, "등급": "A"}], "audit-test-2")  # 감사로 A 를 만들지 않음
+        c = db.scalar(select(PlaceCoordCheck).where(PlaceCoordCheck.batch == "audit-test"))
+        assert (c.grade, c.sub_grade, c.location_type, c.method) == ("C", "C2", "business_address", "audit")
+        assert "같은 좌표 17곳" in c.evidence
+        assert rollback(db, "audit-test") == 1
+        assert (
+            db.scalar(select(func.count(PlaceCoordCheck.id)).where(PlaceCoordCheck.batch == "audit-test"))
+            == 0
+        )
+        assert db.get(Place, place) is not None

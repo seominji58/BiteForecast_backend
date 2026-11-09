@@ -13,7 +13,8 @@ from functools import lru_cache
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Place, Station
+from app.models import Place, PlaceCoordCheck, Station
+from app.schemas.place import CoordOut, PlaceOut
 from app.services.warning import sea_keywords
 
 # 같은 시·도의 (좌표가 다른) 가장 가까운 낚시터가 이만큼 넘게 떨어져 있고,
@@ -65,9 +66,75 @@ def _suspects_cached(version: tuple[int, int]) -> frozenset[int]:
 
 
 def suspect_place_ids(db: Session) -> frozenset[int]:
-    """좌표가 의심되는 낚시터 ID (낚시터 목록이 바뀌면 다시 계산)"""
+    """정밀 위치 기반 기능에서 뺄 낚시터 ID = 자동 규칙 ∪ 수동 목록 ∪ 최근 검증 기록이 D 등급인 곳.
+
+    원본 데이터·일반 상세 정보는 그대로 두고, 해황 연결·지도·거리순·추천에서만 뺀다.
+    """
     version = db.execute(select(func.count(Place.id), func.max(Place.id))).one()
-    return _suspects_cached((int(version[0]), int(version[1] or 0))) | MANUAL_CHECK_IDS
+    graded_d = frozenset(pid for pid, c in coord_states(db).items() if c.grade == "D")
+    return _suspects_cached((int(version[0]), int(version[1] or 0))) | MANUAL_CHECK_IDS | graded_d
+
+
+# --- 좌표 검증 기록 (place_coord_check) ---
+
+_LABEL = {
+    "fishing_spot": "실제 낚시 위치 확인",
+    "harbor": "항구·해변 대표 위치",
+    "business_address": "대략 위치 · 사업장·어촌계 대표 주소 기준",
+    "approx_area": "대략 위치 · 반올림·공유 좌표",
+    "agency_point": "기관 지정 대표 지점",
+    "unverifiable": "위치 확인 필요",
+    "unknown": "신고 좌표 · 실제 낚시 지점 미확인",
+}
+
+
+def _coord_out(c: PlaceCoordCheck) -> CoordOut:
+    approx = c.sub_grade == "C2" or c.location_type in ("business_address", "approx_area")
+    label = _LABEL.get(c.location_type, _LABEL["unknown"])
+    if c.grade == "D":
+        label = _LABEL["unverifiable"]
+    elif c.grade == "C" and c.location_type == "harbor":
+        label = "항구·해변 대표 위치(추정)"
+    return CoordOut(
+        grade=c.grade,  # type: ignore[arg-type]
+        sub_grade=c.sub_grade,
+        location_type=c.location_type,
+        status=c.status,
+        approx=approx,
+        label=label,
+        checked_at=c.checked_at,
+    )
+
+
+@lru_cache(maxsize=4)
+def _coord_cached(version: tuple[int, int]) -> dict[int, CoordOut]:
+    from app.core.db import SessionLocal
+
+    with SessionLocal() as db:
+        # 장소마다 가장 최근 기록 (같은 시각이면 나중에 넣은 것)
+        latest = (
+            select(PlaceCoordCheck.place_id, func.max(PlaceCoordCheck.id).label("mid"))
+            .group_by(PlaceCoordCheck.place_id)
+            .subquery()
+        )
+        rows = db.scalars(select(PlaceCoordCheck).join(latest, PlaceCoordCheck.id == latest.c.mid)).all()
+        return {r.place_id: _coord_out(r) for r in rows}
+
+
+def coord_states(db: Session) -> dict[int, CoordOut]:
+    """장소별 현재 좌표 품질 (가장 최근 검증 기록). 기록이 바뀌면 다시 읽는다"""
+    v = db.execute(select(func.count(PlaceCoordCheck.id), func.max(PlaceCoordCheck.id))).one()
+    return _coord_cached((int(v[0]), int(v[1] or 0)))
+
+
+def place_out(db: Session, place: Place) -> PlaceOut:
+    """응답용 낚시터 (위치 확인 필요 여부·좌표 품질 포함)"""
+    return PlaceOut.model_validate(place).model_copy(
+        update={
+            "location_suspect": place.id in suspect_place_ids(db),
+            "coord": coord_states(db).get(place.id),
+        }
+    )
 
 
 @lru_cache(maxsize=4)
