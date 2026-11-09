@@ -8,8 +8,9 @@ from app.models import Place
 from app.models.base import utcnow
 from app.models.enums import DataKind
 from app.schemas.compare import CompareOut, DataSourceOut, DateRangeOut, PlaceConditionsOut, RegulationOut
-from app.schemas.summary import PlacesSummaryOut
+from app.schemas.summary import DataStatusOut, PlacesSummaryOut
 from app.services import compare as svc
+from app.services.freshness import data_status
 from app.services.regulation import evaluate
 from app.services.summary import summarize
 
@@ -31,7 +32,14 @@ def places_summary(date: date, db: DbSession):
         generated_at=utcnow(),
         places=summarize(db, date),
         disclaimer=svc.DISCLAIMER,
+        data_status=data_status(db),
     )
+
+
+@router.get("/meta/data-status", response_model=DataStatusOut)
+def meta_data_status(db: DbSession):
+    """자료별 마지막 수집 시각과 오래됨 여부"""
+    return data_status(db)
 
 
 @router.get("/places/{place_id}/conditions", response_model=PlaceConditionsOut)

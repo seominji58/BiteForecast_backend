@@ -331,3 +331,50 @@ def test_places_summary(client, places):
     assert p["warning_level"] == "unknown"
     assert "보장하지 않으며" in body["disclaimer"]
     assert client.get("/api/v1/places-summary?date=2000-01-01").status_code == 400
+
+
+def test_data_status_fresh_then_stale(client, monkeypatch):
+    from datetime import timedelta
+
+    from app.core.db import SessionLocal
+    from app.models import MarineWarningSnapshot, OceanReading, Station
+    from app.models.base import utcnow
+    from app.models.enums import DataKind, Metric, StationKind
+    from app.services import freshness
+
+    with SessionLocal() as db:
+        st = Station(provider="KMA", external_id="FRESH_T", name="신선도 테스트", kind=StationKind.KMA)
+        db.add(st)
+        db.flush()
+        now = utcnow()
+        db.add(
+            OceanReading(
+                station_id=st.id,
+                metric=Metric.WAVE_HEIGHT,
+                kind=DataKind.FORECAST,
+                t=now,
+                value=0.5,
+                unit="m",
+                issued_at=now,
+                fetched_at=now,
+            )
+        )
+        db.add(
+            MarineWarningSnapshot(
+                issued_at=now,
+                fetched_at=now,
+                active_json="[]",
+                preliminary_json="[]",
+                raw_active="",
+                raw_preliminary="",
+            )
+        )
+        db.commit()
+    body = client.get("/api/v1/meta/data-status").json()
+    assert body["stale"] is False and body["stale_reason"] is None and body["stale_after_hours"] == 3
+
+    # 수집이 5시간 멈춘 상황: 오래됨 + 몇 시간째인지 안내
+    later = utcnow() + timedelta(hours=5)
+    monkeypatch.setattr(freshness, "utcnow", lambda: later)
+    body = client.get("/api/v1/meta/data-status").json()
+    assert body["stale"] is True and "시간 넘게 갱신되지 않았어요" in body["stale_reason"]
