@@ -149,7 +149,8 @@ class TripListItemOut(BaseModel):
     first_stop: TripStopOut | None
 
 
-ForecastStatus = Literal["available", "pending", "past", "location_check"]
+# location_review: 좌표 불일치 의심 — 좌표 기준 해황 판단 보류(특보는 주소 기준으로 보여줌)
+ForecastStatus = Literal["available", "pending", "past", "location_check", "location_review"]
 
 
 class StopOutlookOut(BaseModel):
@@ -167,6 +168,8 @@ class StopOutlookOut(BaseModel):
     warning_types: list[str] = []
     warning_is_current: bool = False
     tides: list[TideEventOut] = []
+    # 특보 안내 (좌표 불일치 의심 곳: 주소 기준 특보의 한계)
+    warning_note: str | None = None
 
 
 class TripOutlookOut(BaseModel):

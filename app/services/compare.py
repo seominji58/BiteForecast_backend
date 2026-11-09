@@ -41,7 +41,7 @@ from app.schemas.compare import (
     SourceOut,
     WarningOut,
 )
-from app.services.location import place_out, same_sea, suspect_place_ids
+from app.services.location import place_out, review_hold_ids, same_sea, suspect_place_ids
 from app.services.regulation import evaluate
 from app.services.warning import evaluate as evaluate_warning
 
@@ -179,9 +179,39 @@ def _location_check_out(db: Session, place: Place, day: date) -> PlaceCompareOut
     )
 
 
+def _location_review_out(db: Session, place: Place, day: date) -> PlaceCompareOut:
+    """좌표 불일치 의심(C등급 유지·추천 보류): 좌표로 연결한 자료(파고·풍속 예보 격자, 부이, 조위관측소,
+    바다낚시지수)는 판단을 보류한다. 해상 특보는 등록 주소 기준이라 그대로 보여주되 한계를 함께 알린다"""
+    reason = "LOCATION_REVIEW"
+    series = [
+        _unavailable("tide_extreme", "cm", DataKind.FORECAST, reason),
+        _unavailable("tide_level", "cm", DataKind.FORECAST, reason),
+    ]
+    for metric, unit in OCEAN_METRICS:
+        series.append(_unavailable(metric.value, unit, DataKind.OBSERVED, reason))
+        if metric in FORECAST_METRICS:
+            series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
+    warning = evaluate_warning(db, place)
+    warning.note = (
+        f"특보는 등록 주소({place.region.name}) 기준 해역"
+        f"({'·'.join(warning.seas) or '확인 불가'})으로 연결했어요. "
+        "좌표가 주소와 다른 시·군에 있어 실제 낚시 위치가 다른 해역이면 그 해역 특보도 확인하세요."
+    )
+    return PlaceCompareOut(
+        place=place_out(db, place),
+        region_name=place.region.name,
+        regulation=evaluate(db, place.id, day),
+        warning=warning,
+        fishing_index=FishingIndexOut(status="unavailable", reason=reason),
+        series=series,
+    )
+
+
 def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
     if place.id in suspect_place_ids(db):
         return _location_check_out(db, place, day)
+    if place.id in review_hold_ids(db):
+        return _location_review_out(db, place, day)
     by_role = {ps.role: ps for ps in place.stations}
     lo, hi = kst_day_range(day)
     now = utcnow()

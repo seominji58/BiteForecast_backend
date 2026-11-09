@@ -36,8 +36,9 @@ from app.schemas.trip import (
 )
 from app.services import compare as compare_svc
 from app.services.freshness import data_status
-from app.services.location import coord_states, suspect_place_ids
+from app.services.location import coord_states, review_hold_ids, suspect_place_ids
 from app.services.summary import summarize_place
+from app.services.warning import evaluate as evaluate_warning
 
 DEFAULT_CHECKLIST = ["낚싯대·릴·채비", "미끼·보냉 장비", "구명조끼", "출발 전 기상특보 재확인"]
 
@@ -362,6 +363,7 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
     last = forecast_last_day(ds.forecast_valid_until)
     rng = compare_svc.date_range()
     suspects = suspect_place_ids(db)
+    holds = review_hold_ids(db)
     out: list[StopOutlookOut] = []
     for s in t.stops:
         base = {"stop_id": s.id, "day": s.day, "place_id": s.place_id}
@@ -370,6 +372,23 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
             continue
         if s.day < today:
             out.append(StopOutlookOut(**base, forecast_status="past"))
+            continue
+        if s.place_id in holds:
+            # 좌표 기준 자료는 판단 보류. 특보는 주소 기준(오늘이면 지금 발효 상태)만
+            w = evaluate_warning(db, s.place)
+            out.append(
+                StopOutlookOut(
+                    **base,
+                    forecast_status="location_review",
+                    warning_level=w.level,
+                    warning_types=sorted({m.type for m in w.active}),
+                    warning_is_current=s.day == today,
+                    warning_note=(
+                        f"특보는 등록 주소({s.place.region.name}) 기준이에요. "
+                        "실제 위치가 다른 해역이면 그 해역 특보도 확인하세요."
+                    ),
+                )
+            )
             continue
         pending = last is None or s.day > last
         if s.day > rng.max:

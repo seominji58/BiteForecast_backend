@@ -164,3 +164,45 @@ def test_address_batch_keeps_grade_and_holds_recommendation(client, place):
         p["coord"]["grade"] == "C" and p["coord"]["recommend_hold"] is True and p["coord"]["approx"] is True
     )
     assert p["location_suspect"] is False and "좌표 불일치 의심" in p["coord"]["label"]
+
+
+def test_review_hold_place_withholds_coordinate_data_but_keeps_address_warning(client, place):
+    """좌표 불일치 의심: C등급 유지, 좌표 기준 해황은 판단 보류, 특보는 주소 기준 + 안내"""
+    from tests.conftest import signup
+
+    with SessionLocal() as db:
+        db.add(
+            PlaceCoordCheck(
+                place_id=place,
+                grade="C",
+                location_type="unknown",
+                status="coord_mismatch_suspected",
+                method="vworld",
+                evidence="테스트",
+                batch="t-hold",
+            )
+        )
+        db.commit()
+    day = str(today_kst())
+    pc = client.get(f"/api/v1/places/{place}/conditions", params={"date": day}).json()["place"]
+    assert all(s["status"] == "unavailable" and s["reason"] == "LOCATION_REVIEW" for s in pc["series"])
+    assert pc["fishing_index"]["reason"] == "LOCATION_REVIEW"
+    assert pc["warning"]["reason"] != "LOCATION_CHECK" and pc["warning"]["basis"] == "address"
+    assert "등록 주소" in pc["warning"]["note"]
+    assert pc["place"]["coord"]["grade"] == "C" and pc["place"]["location_suspect"] is False
+
+    summary_service._cache.clear()
+    s = next(
+        x for x in client.get(f"/api/v1/places-summary?date={day}").json()["places"] if x["place_id"] == place
+    )
+    assert s["wave_fc_max"] is None and s["wind_fc_max"] is None and s["next_tide"] is None
+
+    h = signup(client)
+    t = client.post(
+        "/api/v1/me/trips",
+        json={"start_date": day, "end_date": day, "stops": [{"day": day, "place_id": place}]},
+        headers=h,
+    ).json()
+    o = client.get(f"/api/v1/me/trips/{t['id']}/outlook", headers=h).json()["stops"][0]
+    assert o["forecast_status"] == "location_review" and o["wave_fc_max"] is None and o["tides"] == []
+    assert o["warning_note"] and o["warning_is_current"] is True

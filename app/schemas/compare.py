@@ -16,7 +16,15 @@ SeriesStatus = Literal["ok", "unavailable"]
 #   TOO_FAR        가장 가까운 지점이 너무 멀어 표시하지 않음 (바다낚시지수)
 # LOCATION_CHECK: 원본 좌표가 의심돼 자료를 연결하지 않음 / DIFFERENT_SEA: 가까운 조위관측소가 다른 바다를 봄
 SeriesReason = Literal[
-    "NO_STATION", "NO_DATA", "FUTURE_DATE", "NOT_CONNECTED", "TOO_FAR", "LOCATION_CHECK", "DIFFERENT_SEA"
+    "NO_STATION",
+    "NO_DATA",
+    "FUTURE_DATE",
+    "NOT_CONNECTED",
+    "TOO_FAR",
+    "LOCATION_CHECK",
+    "DIFFERENT_SEA",
+    # 좌표 불일치 의심(추가 검증 필요) — 좌표 기준 자료는 판단 보류
+    "LOCATION_REVIEW",
 ]
 
 
@@ -112,6 +120,10 @@ class WarningOut(BaseModel):
     issued_at: datetime | None = None
     fetched_at: datetime | None = None
     source: str = "기상청 기상특보"
+    # 특보를 어떤 기준으로 연결했는지 — address: 등록 주소의 시·도·시군 → 특보 해역
+    basis: Literal["address"] = "address"
+    # 좌표 불일치 의심 곳: 주소 기준 특보의 한계 안내
+    note: str | None = None
 
 
 class PlaceCompareOut(BaseModel):

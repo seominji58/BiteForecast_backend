@@ -75,6 +75,11 @@ def suspect_place_ids(db: Session) -> frozenset[int]:
     return _suspects_cached((int(version[0]), int(version[1] or 0))) | MANUAL_CHECK_IDS | graded_d
 
 
+def review_hold_ids(db: Session) -> frozenset[int]:
+    """좌표 불일치 의심(추가 검증 필요) 낚시터 — C등급 유지, 추천·좌표 기준 해황 판단 보류"""
+    return frozenset(pid for pid, c in coord_states(db).items() if c.recommend_hold)
+
+
 # --- 좌표 검증 기록 (place_coord_check) ---
 
 _LABEL = {
