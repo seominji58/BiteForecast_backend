@@ -370,6 +370,9 @@ def main() -> None:
     parser.add_argument("--loop", action="store_true", help="1시간마다 반복 실행")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    # httpx 는 INFO 에서 요청 URL 전체(serviceKey 인증키 포함)를 찍는다 → 경고 이상만 남긴다 (NFR-03)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     init_db()
     while True:
