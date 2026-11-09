@@ -16,6 +16,8 @@ class PlaceOut(ORMModel):
     lat: float | None
     lon: float | None
     address: str | None
+    # 원본 좌표가 같은 시·군 낚시터들과 크게 어긋남 → 해황 자료를 연결하지 않는다 (DB 좌표는 그대로)
+    location_suspect: bool = False
 
 
 class PlaceInfoOut(ORMModel):

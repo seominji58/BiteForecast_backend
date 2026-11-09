@@ -9,6 +9,14 @@ class ValueAt(BaseModel):
     t: datetime
 
 
+class TideEventOut(BaseModel):
+    type: Literal["high", "low"]
+    t: datetime
+    v: float | None
+    station_name: str
+    station_km: float | None
+
+
 class IndexSummaryOut(BaseModel):
     """국립해양조사원 바다낚시지수 (현재 시간대) — 어종별 등급 중 가장 높은·낮은 등급. 앱 판정 아님"""
 
@@ -33,6 +41,12 @@ class PlaceSummaryOut(BaseModel):
     wind_fc_max: ValueAt | None
     temp_obs: ValueAt | None
     index: IndexSummaryOut | None
+    # 원본 좌표 의심 → 자료 연결 안 함 (출조 후보·지도에서 제외)
+    location_suspect: bool = False
+    # 바다 권역 (특보 해역 기준): 서해 · 남해 · 동해 · 제주. 알 수 없으면 None
+    sea_group: Literal["서해", "남해", "동해", "제주"] | None = None
+    # 다음(오늘) 또는 그날 첫 만조·간조 — 같은 바다 조위관측소 예보일 때만
+    next_tide: TideEventOut | None = None
 
 
 class DataStatusOut(BaseModel):

@@ -14,7 +14,10 @@ SeriesStatus = Literal["ok", "unavailable"]
 #   FUTURE_DATE    미래 날짜에는 실측이 없음
 #   NOT_CONNECTED  자료 출처가 아직 연결되지 않음 (예: 파고·풍속 예보)
 #   TOO_FAR        가장 가까운 지점이 너무 멀어 표시하지 않음 (바다낚시지수)
-SeriesReason = Literal["NO_STATION", "NO_DATA", "FUTURE_DATE", "NOT_CONNECTED", "TOO_FAR"]
+# LOCATION_CHECK: 원본 좌표가 의심돼 자료를 연결하지 않음 / DIFFERENT_SEA: 가까운 조위관측소가 다른 바다를 봄
+SeriesReason = Literal[
+    "NO_STATION", "NO_DATA", "FUTURE_DATE", "NOT_CONNECTED", "TOO_FAR", "LOCATION_CHECK", "DIFFERENT_SEA"
+]
 
 
 class SourceOut(BaseModel):
@@ -102,7 +105,7 @@ class WarningOut(BaseModel):
     """기상청 해상 특보 (공식 발표). level=unknown 이면 「특보 없음」으로 표시하지 않는다"""
 
     level: Literal["warning", "nearby", "preliminary", "none", "unknown"]
-    reason: Literal["NO_DATA", "UNKNOWN_SEA"] | None = None
+    reason: Literal["NO_DATA", "UNKNOWN_SEA", "LOCATION_CHECK"] | None = None
     seas: list[str] = []  # 이 장소에 적용한 바다 (예: 서해중부)
     active: list[WarningMatchOut] = []
     preliminary: list[WarningMatchOut] = []

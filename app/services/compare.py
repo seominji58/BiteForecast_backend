@@ -39,8 +39,10 @@ from app.schemas.compare import (
     PointOut,
     SeriesOut,
     SourceOut,
+    WarningOut,
 )
 from app.schemas.place import PlaceOut
+from app.services.location import same_sea, suspect_place_ids
 from app.services.regulation import evaluate
 from app.services.warning import evaluate as evaluate_warning
 
@@ -155,7 +157,32 @@ def _forecast_series(db: Session, ps: PlaceStation | None, metric: Metric, unit:
     )
 
 
+def _location_check_out(db: Session, place: Place, day: date) -> PlaceCompareOut:
+    """좌표가 의심되는 낚시터: 다른 지역 자료가 붙지 않도록 해황 자료를 연결하지 않는다"""
+    reason = "LOCATION_CHECK"
+    series = [
+        _unavailable("tide_extreme", "cm", DataKind.FORECAST, reason),
+        _unavailable("tide_level", "cm", DataKind.FORECAST, reason),
+    ]
+    for metric, unit in OCEAN_METRICS:
+        series.append(_unavailable(metric.value, unit, DataKind.OBSERVED, reason))
+        if metric in FORECAST_METRICS:
+            series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
+    out = PlaceOut.model_validate(place)
+    out.location_suspect = True
+    return PlaceCompareOut(
+        place=out,
+        region_name=place.region.name,
+        regulation=evaluate(db, place.id, day),
+        warning=WarningOut(level="unknown", reason="LOCATION_CHECK"),
+        fishing_index=FishingIndexOut(status="unavailable", reason=reason),
+        series=series,
+    )
+
+
 def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
+    if place.id in suspect_place_ids(db):
+        return _location_check_out(db, place, day)
     by_role = {ps.role: ps for ps in place.stations}
     lo, hi = kst_day_range(day)
     now = utcnow()
@@ -166,6 +193,18 @@ def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
     if tide is None:
         series.append(_unavailable("tide_extreme", "cm", DataKind.FORECAST, "NO_STATION"))
         series.append(_unavailable("tide_level", "cm", DataKind.FORECAST, "NO_STATION"))
+    elif same_sea(db, place, tide.station_id) is False:
+        # 거리가 가까워도 다른 바다를 보는 조위관측소면 대표 자료로 쓰지 않는다
+        series.append(
+            _unavailable(
+                "tide_extreme", "cm", DataKind.FORECAST, "DIFFERENT_SEA", _source(tide, EP_TIDE_EXTREME)
+            )
+        )
+        series.append(
+            _unavailable(
+                "tide_level", "cm", DataKind.FORECAST, "DIFFERENT_SEA", _source(tide, EP_TIDE_HOURLY)
+            )
+        )
     else:
         ext = db.scalars(
             select(TideExtreme)

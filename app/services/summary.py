@@ -17,7 +17,7 @@ from app.core.timeutil import today_kst
 from app.models import Place, PlaceStation
 from app.models.base import utcnow
 from app.schemas.compare import SeriesOut
-from app.schemas.summary import IndexSummaryOut, PlaceSummaryOut, ValueAt
+from app.schemas.summary import IndexSummaryOut, PlaceSummaryOut, TideEventOut, ValueAt
 from app.services.compare import _place_compare
 
 KST = ZoneInfo("Asia/Seoul")
@@ -72,6 +72,19 @@ def _index(pc) -> IndexSummaryOut | None:
     )
 
 
+def _sea_group(seas: list[str]) -> str | None:
+    for s in seas:
+        if s.startswith("서해"):
+            return "서해"
+        if s.startswith("남해"):
+            return "남해"
+        if s.startswith("동해") or s == "울릉도":
+            return "동해"
+        if s.startswith("제주"):
+            return "제주"
+    return None
+
+
 def summarize(db: Session, day: date) -> list[PlaceSummaryOut]:
     hit = _cache.get(day)
     if hit and time.monotonic() - hit[0] < _TTL_SECONDS:
@@ -92,9 +105,22 @@ def summarize(db: Session, day: date) -> list[PlaceSummaryOut]:
         pc = _place_compare(db, place, day)
         wave_obs = _find(pc.series, "wave_height", "observed")
         wind_obs = _find(pc.series, "wind_speed", "observed")
+        tide = next((x for x in pc.series if x.metric == "tide_extreme" and x.status == "ok"), None)
+        upcoming = [e for e in (tide.extremes or []) if after is None or e.t >= after] if tide else []
         out.append(
             PlaceSummaryOut(
                 place_id=place.id,
+                location_suspect=pc.place.location_suspect,
+                sea_group=_sea_group(pc.warning.seas),
+                next_tide=TideEventOut(
+                    type=upcoming[0].type,
+                    t=upcoming[0].t,
+                    v=upcoming[0].v,
+                    station_name=tide.source.station_name if tide.source else "",
+                    station_km=tide.source.distance_km if tide.source else None,
+                )
+                if upcoming
+                else None,
                 warning_level=pc.warning.level,
                 warning_types=sorted({m.type for m in pc.warning.active}),
                 wave_obs=_latest(wave_obs),

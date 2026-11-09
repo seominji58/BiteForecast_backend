@@ -6,6 +6,7 @@ from app.api.deps import DbSession
 from app.models import Place, PlaceInfo, PlaceStation, Region, Species
 from app.schemas.journal import SpeciesOut
 from app.schemas.place import PlaceDetailOut, PlaceInfoOut, PlaceOut, PlaceStationOut, RegionOut
+from app.services.location import suspect_place_ids
 
 router = APIRouter(tags=["places"])
 
@@ -40,7 +41,11 @@ def list_places(db: DbSession, q: str | None = None, region_id: int | None = Non
         stmt = stmt.where(
             or_(Place.name.contains(term), Region.name.contains(term), PlaceInfo.address.contains(term))
         )
-    return db.scalars(stmt.order_by(Region.name, Place.name)).all()
+    rows = db.scalars(stmt.order_by(Region.name, Place.name)).all()
+    suspects = suspect_place_ids(db)
+    return [
+        PlaceOut.model_validate(p).model_copy(update={"location_suspect": p.id in suspects}) for p in rows
+    ]
 
 
 @router.get("/places/{place_id}", response_model=PlaceDetailOut)
@@ -58,7 +63,8 @@ def get_place(place_id: int, db: DbSession):
         raise HTTPException(status_code=404, detail="장소를 찾을 수 없습니다")
 
     return PlaceDetailOut(
-        **PlaceOut.model_validate(place).model_dump(),
+        **PlaceOut.model_validate(place).model_dump(exclude={"location_suspect"}),
+        location_suspect=place.id in suspect_place_ids(db),
         info=PlaceInfoOut.model_validate(place.info) if place.info else None,
         stations=[
             PlaceStationOut(
