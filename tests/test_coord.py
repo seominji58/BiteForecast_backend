@@ -107,3 +107,27 @@ def test_register_and_rollback(client, place):
             == 0
         )
         assert db.get(Place, place) is not None
+
+
+def test_d_grade_place_in_trip_has_no_location_data(client, place):
+    """D등급 낚시터도 출조계획에는 넣을 수 있지만, 위치·해황을 정상처럼 주지 않는다"""
+    from tests.conftest import signup
+
+    _check(place, "D", None, "unverifiable")
+    h = signup(client)
+    day = str(today_kst() + timedelta(days=1))
+    t = client.post(
+        "/api/v1/me/trips",
+        json={"start_date": day, "end_date": day, "stops": [{"day": day, "place_id": place}]},
+        headers=h,
+    ).json()
+    stop = t["stops"][0]
+    assert stop["place"]["location_suspect"] is True and stop["place"]["coord"]["grade"] == "D"
+    o = client.get(f"/api/v1/me/trips/{t['id']}/outlook", headers=h).json()["stops"][0]
+    assert o["forecast_status"] == "location_check"
+    assert (
+        o["wave_fc_max"] is None
+        and o["wind_fc_max"] is None
+        and o["tides"] == []
+        and o["warning_level"] is None
+    )
