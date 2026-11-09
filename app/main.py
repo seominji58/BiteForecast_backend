@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.core import logsafe
 from app.core.config import get_settings
 from app.core.db import init_db
 from app.routers import admin, auth, community, compare, health, journals, me, photos, places
@@ -24,6 +25,7 @@ _HTTP_CODES = {
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    logsafe.install()  # 서버 로그에도 인증키·관리자 토큰이 남지 않게
     init_db()
     yield
 

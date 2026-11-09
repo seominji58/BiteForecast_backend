@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from app.clients.khoa import BuoyRow, KhoaError
 from app.clients.kma import KmaForecastClient, latest_base_time
 from app.clients.kma_warning import KmaWarningClient
+from app.core import logsafe
 from app.core.config import get_settings
 from app.core.db import SessionLocal, init_db
 from app.core.timeutil import kst_day_range, today_kst
@@ -370,9 +371,8 @@ def main() -> None:
     parser.add_argument("--loop", action="store_true", help="1시간마다 반복 실행")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    # httpx 는 INFO 에서 요청 URL 전체(serviceKey 인증키 포함)를 찍는다 → 경고 이상만 남긴다 (NFR-03)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    # 인증키가 로그에 남지 않게: httpx URL 로그 끔 + 모든 로그에서 키 문자열 가림 (NFR-03)
+    logsafe.install()
 
     init_db()
     while True:
