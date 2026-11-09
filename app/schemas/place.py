@@ -23,6 +23,9 @@ class CoordOut(BaseModel):
     approx: bool
     # 화면에 그대로 쓰는 짧은 설명
     label: str
+    # 좌표 불일치 의심(추가 검증 필요) → 검증 전까지 출조 후보·가까운 곳 추천에서 뺀다
+    # (지도·상세에는 안내와 함께 남김)
+    recommend_hold: bool = False
     checked_at: datetime
 
 

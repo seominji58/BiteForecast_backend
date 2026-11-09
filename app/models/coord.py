@@ -26,8 +26,14 @@ LOCATION_TYPES = (
     "unverifiable",  # 위치 확인 불가 (오류 의심)
     "unknown",  # 근거 없음
 )
-# 검증 상태
-STATUSES = ("unverified", "needs_review", "verified")
+# 검증 상태 (내부 검토 상태)
+STATUSES = (
+    "unverified",  # 미검증
+    "needs_review",  # 우선 검토
+    "verified",  # 검증 완료
+    "coord_mismatch_suspected",  # 좌표 불일치 의심·추가 검증 필요 (주소와 좌표의 행정구역이 다름) — 추천 보류
+    "address_location_candidate",  # 사업장·대표 주소 위치 확인 후보 (실제 낚시 위치 아님)
+)
 # 확인 출처
 METHODS = ("audit", "juso", "vworld", "agency", "manual")
 

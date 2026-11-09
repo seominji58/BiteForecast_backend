@@ -28,8 +28,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from app.core.utmk import to_wgs84  # noqa: E402
 
 JUSO_URL = "https://business.juso.go.kr/addrlink/addrLinkApi.do"
+JUSO_COORD_URL = "https://business.juso.go.kr/addrlink/addrCoordApi.do"
 VWORLD_URL = "https://api.vworld.kr/req/address"
 
 # 새 광역 행정구역 이름 → 주소 DB 가 아직 모를 수 있는 기존 이름 (조회 실패 시 한 번 더 시도, 결과에 표시)
@@ -117,9 +120,47 @@ def same_address(query: str, refined: str) -> tuple[bool, str]:
 
 
 class Juso:
-    def __init__(self, key: str):
+    def __init__(self, key: str, coord_key: str = ""):
         self.key = key
         self.disabled = "" if key else "키 없음"
+        # 좌표제공 API (건물 단위, UTM-K). 키가 없으면 좌표 대조는 건너뛴다
+        self.coord_key = coord_key
+        self.coord_disabled = "" if coord_key else "좌표 키(JUSO_COORD_KEY) 없음"
+
+    def coord(self, item: dict) -> dict:
+        """검색에서 한 건으로 맞은 주소의 건물 좌표 → 위경도. 좌표는 거리 계산에만 쓴다"""
+        if self.coord_disabled:
+            return {"status": "건너뜀", "detail": self.coord_disabled}
+        need = ("admCd", "rnMgtSn", "udrtYn", "buldMnnm", "buldSlno")
+        if not all(item.get(k) not in (None, "") for k in need):
+            return {"status": "대상 아님", "detail": "건물 정보 없음"}
+        url = (
+            JUSO_COORD_URL
+            + "?"
+            + urllib.parse.urlencode(
+                {"confmKey": self.coord_key, "resultType": "json", **{k: item[k] for k in need}}
+            )
+        )
+        err, d = http_json(url)
+        time.sleep(0.6)
+        if err or d is None:
+            return {"status": "검색 실패", "detail": err or "응답 없음"}
+        common = d["results"]["common"]
+        if common.get("errorCode") != "0":
+            if common.get("errorCode") == "E0001":
+                self.coord_disabled = f"좌표 키 미승인({common['errorCode']})"
+            return {
+                "status": "검색 실패",
+                "detail": f"{common.get('errorCode')} {common.get('errorMessage')}",
+            }
+        items = d["results"].get("juso") or []
+        if not items:
+            return {"status": "결과 없음", "detail": ""}
+        try:
+            lat, lon = to_wgs84(float(items[0]["entX"]), float(items[0]["entY"]))
+        except (KeyError, TypeError, ValueError):
+            return {"status": "검색 실패", "detail": "좌표 없음"}
+        return {"status": "검색됨", "detail": "", "_pt": (lat, lon)}
 
     def search(self, keyword: str) -> dict:
         if self.disabled:
@@ -164,6 +205,7 @@ class Juso:
                 "detail": "",
                 "road": x["roadAddr"],
                 "jibun": x["jibunAddr"],
+                "_item": x,
                 "n": len(items),
             }
         if len(items) > 1 or len(exact) > 1:
@@ -333,7 +375,7 @@ def main() -> int:
     a = ap.parse_args()
 
     env = load_env()
-    juso = Juso(env.get("JUSO_SEARCH_KEY", ""))
+    juso = Juso(env.get("JUSO_SEARCH_KEY", ""), env.get("JUSO_COORD_KEY", ""))
     vw = VWorld(env.get("VWORLD_API_KEY", ""))
     rows = list(csv.DictReader(open(a.audit_csv, encoding="utf-8-sig")))
     if a.ids:
@@ -391,6 +433,11 @@ def main() -> int:
         v_road, n1 = try_vw(road, "road") if road else ({"status": "주소 없음", "detail": ""}, "")
         v_par, n2 = try_vw(jibun, "parcel") if jibun else ({"status": "주소 없음", "detail": ""}, "")
         j = juso.search(road or jibun) if (road or jibun) else {"status": "주소 없음", "detail": ""}
+        jc = (
+            juso.coord(j["_item"])
+            if "_item" in j
+            else {"status": "대상 아님", "detail": "검색이 한 건으로 맞지 않음"}
+        )
 
         d_road = (
             round(km(orig, v_road["_pt"]), 2) if "_pt" in v_road and v_road["status"] == "검색됨" else None
@@ -399,6 +446,10 @@ def main() -> int:
         # 도로명·지번 두 결과가 서로 얼마나 떨어졌는지 (주소 데이터 자체의 불일치)
         d_rp = round(km(v_road["_pt"], v_par["_pt"]), 2) if d_road is not None and d_par is not None else None
         d = d_par if (jisun and d_par is not None) else (d_road if d_road is not None else d_par)
+        # 두 API 결과 대조: 행정안전부 건물 좌표 ↔ 원본 좌표, ↔ VWorld 좌표
+        d_juso = round(km(orig, jc["_pt"]), 2) if "_pt" in jc else None
+        vw_pt = (v_road if d_road is not None else v_par).get("_pt") if d is not None else None
+        d_jv = round(km(jc["_pt"], vw_pt), 2) if "_pt" in jc and vw_pt else None
 
         if d is not None:
             state = "대조 완료"
@@ -448,6 +499,18 @@ def main() -> int:
                 "VWorld 지번 상태": v_par["status"]
                 + (f" · {v_par['detail']}" if v_par.get("detail") else ""),
                 "행안부 검색 상태": j["status"] + (f" · {j['detail']}" if j.get("detail") else ""),
+                "행안부 좌표 상태": jc["status"] + (f" · {jc['detail']}" if jc.get("detail") else ""),
+                "원본↔행안부좌표 km": d_juso,
+                "행안부↔VWorld 좌표 km": d_jv,
+                "두 API 좌표 차이": ""
+                if d_jv is None
+                else (
+                    "같은 곳(≤0.1km)"
+                    if d_jv <= 0.1
+                    else "조금 다름(0.1~1km)"
+                    if d_jv <= 1
+                    else "다름(>1km) — 원인 확인"
+                ),
                 "원본↔도로명주소 km": d_road,
                 "원본↔지번주소 km": d_par,
                 "도로명↔지번 주소 간 km": d_rp,
@@ -471,6 +534,8 @@ def main() -> int:
             "도로명↔지번 주소 간 km",
             "판정 거리 km",
             "거리 구간",
+            "원본↔행안부좌표 km",
+            "행안부↔VWorld 좌표 km",
         )
         out = [{k: v for k, v in o.items() if k not in derived} for o in out]
     keys = []
@@ -482,7 +547,8 @@ def main() -> int:
         w = csv.DictWriter(f, fieldnames=keys)
         w.writeheader()
         w.writerows(out)
-    print(f"완료 {len(out)}곳 · 행안부 검색: {juso.disabled or '사용'}")
+    used = f"행안부 검색: {juso.disabled or '사용'} · 행안부 좌표: {juso.coord_disabled or '사용'}"
+    print(f"완료 {len(out)}곳 · {used}")
     return 0
 
 

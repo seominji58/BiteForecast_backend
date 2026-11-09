@@ -131,3 +131,36 @@ def test_d_grade_place_in_trip_has_no_location_data(client, place):
         and o["tides"] == []
         and o["warning_level"] is None
     )
+
+
+def test_address_batch_keeps_grade_and_holds_recommendation(client, place):
+    from app.services.coord_checks import register_address_batch
+
+    _check(place, "C", "C1", "unknown")
+    row = {
+        "id": str(place),
+        "출처구분": "공공데이터 표준",
+        "행안부 검색 상태": "검색됨",
+        "VWorld 도로명 상태": "검색됨",
+        "VWorld 지번 상태": "검색됨",
+        "대조상태": "대조 완료",
+        "원본 좌표 위치": "다른 시군",
+        "위치 유형(추정)": "원본 좌표가 주소와 다른 시·군 — 오류 가능성 높음",
+        "기존등급 변경 후보": "D 후보",
+    }
+    with SessionLocal() as db:
+        with pytest.raises(RegisterError):
+            register_address_batch(db, [{**row, "판정 거리 km": "17.6"}], "addr-test")  # 거리 값 든 CSV 거부
+        assert register_address_batch(db, [row], "addr-test") == 2  # 행안부·VWorld 기록 각각
+        with pytest.raises(RegisterError):
+            register_address_batch(db, [row], "addr-test")  # 같은 배치 중복 거부
+        recs = db.scalars(select(PlaceCoordCheck).where(PlaceCoordCheck.batch == "addr-test")).all()
+        assert {r.method for r in recs} == {"juso", "vworld"}
+        assert all((r.grade, r.sub_grade, r.status) == ("C", "C1", "coord_mismatch_suspected") for r in recs)
+        assert all(r.candidate_lat is None for r in recs)  # 좌표 저장 안 함
+    p = _api_place(client, place)
+    # 등급은 그대로(C), 추천 보류 + 대략 위치 취급, 위치 확인 필요(D)는 아님
+    assert (
+        p["coord"]["grade"] == "C" and p["coord"]["recommend_hold"] is True and p["coord"]["approx"] is True
+    )
+    assert p["location_suspect"] is False and "좌표 불일치 의심" in p["coord"]["label"]

@@ -91,8 +91,14 @@ _LABEL = {
 def _coord_out(c: PlaceCoordCheck) -> CoordOut:
     approx = c.sub_grade == "C2" or c.location_type in ("business_address", "approx_area")
     label = _LABEL.get(c.location_type, _LABEL["unknown"])
+    hold = c.status == "coord_mismatch_suspected"
     if c.grade == "D":
         label = _LABEL["unverifiable"]
+    elif hold:
+        # 주소와 좌표의 행정구역이 다름 — 위치를 정밀하게 쓰지 않는다
+        label, approx = "좌표 불일치 의심 · 추가 검증 필요", True
+    elif c.status == "address_location_candidate":
+        label = "사업장 주소 위치 · 실제 낚시 지점 미확인"
     elif c.grade == "C" and c.location_type == "harbor":
         label = "항구·해변 대표 위치(추정)"
     return CoordOut(
@@ -102,6 +108,7 @@ def _coord_out(c: PlaceCoordCheck) -> CoordOut:
         status=c.status,
         approx=approx,
         label=label,
+        recommend_hold=hold,
         checked_at=c.checked_at,
     )
 

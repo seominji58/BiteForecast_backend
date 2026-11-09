@@ -108,3 +108,88 @@ def rollback(db: Session, batch: str) -> int:
     n = db.execute(delete(PlaceCoordCheck).where(PlaceCoordCheck.batch == batch)).rowcount
     db.commit()
     return n or 0
+
+
+# --- 주소 API 대조 배치 (보고서 docs/03_데이터/2026-11-10_주소API_좌표대조_보고서.md) ---
+
+ADDRESS_REPORT = "docs/03_데이터/2026-11-10_주소API_좌표대조_보고서.md"
+
+
+def _latest(db: Session) -> dict[int, PlaceCoordCheck]:
+    latest = (
+        select(PlaceCoordCheck.place_id, func.max(PlaceCoordCheck.id).label("mid"))
+        .group_by(PlaceCoordCheck.place_id)
+        .subquery()
+    )
+    return {
+        c.place_id: c
+        for c in db.scalars(select(PlaceCoordCheck).join(latest, PlaceCoordCheck.id == latest.c.mid))
+    }
+
+
+def register_address_batch(
+    db: Session, rows: list[dict], batch: str, checked_at: datetime | None = None
+) -> int:
+    """주소 대조 결과(--public CSV)를 검증 이력으로 추가한다.
+
+    - 등급·세부 등급·위치 유형은 직전 기록을 그대로 복사한다 (이번 단계에서 등급 변경 없음)
+    - 내부 검토 상태만 바꾼다: D 후보 → coord_mismatch_suspected, B 후보 → address_location_candidate,
+      우선 확인 → needs_review, 나머지는 직전 상태 유지
+    - 출처별로 기록을 나눈다: method=juso (행정안전부 검색 상태), method=vworld (VWorld 검색 상태·판정)
+    - VWorld 가 돌려준 주소·좌표와 거리 값은 저장하지 않는다 (입력 CSV 에도 없음)
+    """
+    if db.scalar(select(func.count(PlaceCoordCheck.id)).where(PlaceCoordCheck.batch == batch)):
+        raise RegisterError(f"이미 등록된 batch 입니다: {batch}")
+    banned = ("km", "원본↔", "판정 거리")
+    if rows and any(k for k in rows[0] if any(b in k for b in banned)):
+        raise RegisterError("거리 값이 든 CSV 입니다. --public 으로 만든 CSV 만 등록합니다")
+    prev = _latest(db)
+    when = checked_at or datetime.now(UTC)
+    n = 0
+    for r in rows:
+        if r["출처구분"] != "공공데이터 표준":
+            continue  # 주소가 없어 API 를 부르지 않은 곳 (기관 지점·수동 지정)
+        pid = int(r["id"])
+        p = prev.get(pid)
+        if p is None:
+            raise RegisterError(f"기존 검증 이력이 없는 낚시터: {pid}")
+        cand = r["기존등급 변경 후보"]
+        if cand == "D 후보":
+            status = "coord_mismatch_suspected"
+        elif cand.startswith("B 후보"):
+            status = "address_location_candidate"
+        elif "우선 확인" in cand:
+            status = "needs_review"
+        else:
+            status = p.status
+        common = dict(
+            place_id=pid,
+            grade=p.grade,
+            sub_grade=p.sub_grade,
+            location_type=p.location_type,
+            status=status,
+            source_ref=ADDRESS_REPORT,
+            batch=batch,
+            checked_by="scripts/verify_addresses.py",
+            checked_at=when,
+        )
+        db.add(
+            PlaceCoordCheck(
+                **common, method="juso", evidence=f"행정안전부 도로명주소 검색: {r['행안부 검색 상태']}"
+            )
+        )
+        db.add(
+            PlaceCoordCheck(
+                **common,
+                method="vworld",
+                evidence=(
+                    f"VWorld 지오코딩 — 도로명: {r['VWorld 도로명 상태']} / 지번: {r['VWorld 지번 상태']}"
+                    f" · 대조 상태: {r['대조상태']} · 원본 좌표 위치: {r['원본 좌표 위치']}"
+                    f" · 판정(추정): {r['위치 유형(추정)']} · 등급 후보: {cand} (등급 변경 안 함)"
+                    " · VWorld 주소·좌표·거리는 저장하지 않음"
+                ),
+            )
+        )
+        n += 2
+    db.commit()
+    return n

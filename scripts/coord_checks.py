@@ -27,7 +27,7 @@ from sqlalchemy import func, select, text  # noqa: E402
 
 from app.core.db import SessionLocal, engine  # noqa: E402
 from app.models import PlaceCoordCheck  # noqa: E402
-from app.services.coord_checks import RegisterError, register_from_audit, rollback  # noqa: E402
+from app.services.coord_checks import RegisterError, register_address_batch, register_from_audit, rollback  # noqa: E402
 
 
 def main() -> int:
@@ -36,6 +36,9 @@ def main() -> int:
     r = sub.add_parser("register")
     r.add_argument("csv")
     r.add_argument("--batch", required=True)
+    ad = sub.add_parser("register-address")
+    ad.add_argument("csv", help="verify_addresses.py --public 출력")
+    ad.add_argument("--batch", required=True)
     b = sub.add_parser("rollback")
     b.add_argument("--batch", required=True)
     sub.add_parser("summary")
@@ -53,6 +56,14 @@ def main() -> int:
                 print("등록 안 함:", e)
                 return 1
             print(f"등록 {n}건 (batch {a.batch})")
+        elif a.cmd == "register-address":
+            rows = list(csv.DictReader(open(a.csv, encoding="utf-8-sig")))
+            try:
+                n = register_address_batch(db, rows, a.batch)
+            except RegisterError as e:
+                print("등록 안 함:", e)
+                return 1
+            print(f"등록 {n}건 (batch {a.batch}) — 등급 변경 없음")
         elif a.cmd == "rollback":
             print(f"삭제 {rollback(db, a.batch)}건 (batch {a.batch}) — 원본 좌표는 그대로")
         elif a.cmd == "drop-table":
@@ -74,6 +85,7 @@ def main() -> int:
         print("세부", dict(collections.Counter(x.sub_grade for x in latest.values())))
         print("위치 유형", dict(collections.Counter(x.location_type for x in latest.values())))
         print("검증 상태", dict(collections.Counter(x.status for x in latest.values())))
+        print("출처", dict(collections.Counter(x.method for x in rows)))
     return 0
 
 
