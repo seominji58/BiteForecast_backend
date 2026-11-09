@@ -22,12 +22,12 @@ python -m seeds.load
 python -m app.jobs.collect
 
 # 0.0.0.0 으로 열어야 같은 Wi-Fi 의 휴대폰(Expo Go)에서 접속 가능
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 ```
 
-- API 문서: http://localhost:8000/docs
+- API 문서: http://localhost:8001/docs
 - 헬스체크: `GET /api/v1/health`
-- 사진 인증 관리자 화면: http://localhost:8000/api/v1/admin (`ADMIN_TOKEN` 필요)
+- 사진 인증 관리자 화면: http://localhost:8001/api/v1/admin (`ADMIN_TOKEN` 필요)
 - DB 스키마가 바뀌어도 지울 필요 없다. 서버가 켜질 때 새 테이블·컬럼만 추가한다 (운영 전환 시 Alembic)
 
 | 환경변수 | 내용 |
