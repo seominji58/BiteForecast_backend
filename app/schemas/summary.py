@@ -38,12 +38,15 @@ class PlaceSummaryOut(BaseModel):
 class DataStatusOut(BaseModel):
     """자료별 마지막 수집 시각과 오래됨 여부 (수집기가 멈췄을 때 최신처럼 보이지 않게)"""
 
-    forecast_fetched_at: datetime | None  # 기상청 단기예보 (파고·풍속)
+    forecast_fetched_at: datetime | None  # 기상청 단기예보 (파고·풍속) 마지막 수집
+    forecast_issued_at: datetime | None  # 받아 둔 예보 중 가장 최근 발표 시각 (오래됨 판단 기준)
+    forecast_valid_until: datetime | None  # 받아 둔 예보가 다루는 마지막 시각 (이후 날짜는 예보 없음)
     warning_fetched_at: datetime | None  # 기상청 해상 특보
     buoy_fetched_at: datetime | None  # 해양관측부이 실측
     tide_fetched_at: datetime | None  # 조석 예보
     index_fetched_at: datetime | None  # 바다낚시지수
-    stale: bool  # 예보 또는 특보가 기준 시간보다 오래됨 → 출조 탐색 판단에 쓰지 않는다
+    # 예보 발표가 4시간 10분 넘게 없거나 특보 확인이 3시간 넘게 없으면 → 출조 탐색 판단에 쓰지 않는다
+    stale: bool
     stale_reason: str | None
     stale_after_hours: int
 

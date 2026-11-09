@@ -346,6 +346,7 @@ def test_data_status_fresh_then_stale(client, monkeypatch):
         st = Station(provider="KMA", external_id="FRESH_T", name="신선도 테스트", kind=StationKind.KMA)
         db.add(st)
         db.flush()
+        st_id = st.id
         now = utcnow()
         db.add(
             OceanReading(
@@ -374,7 +375,34 @@ def test_data_status_fresh_then_stale(client, monkeypatch):
     assert body["stale"] is False and body["stale_reason"] is None and body["stale_after_hours"] == 3
 
     # 수집이 5시간 멈춘 상황: 오래됨 + 몇 시간째인지 안내
-    later = utcnow() + timedelta(hours=5)
+    later = utcnow() + timedelta(hours=5)  # 예보 기준 4시간 10분, 특보 기준 3시간 모두 초과
     monkeypatch.setattr(freshness, "utcnow", lambda: later)
     body = client.get("/api/v1/meta/data-status").json()
-    assert body["stale"] is True and "시간 넘게 갱신되지 않았어요" in body["stale_reason"]
+    assert body["stale"] is True and "시간 넘게" in body["stale_reason"], body
+
+    # 예보는 3시간 30분째 같은 발표분(다음 발표 전)이지만 특보는 방금 확인 → 오래됨 아님
+    almost = utcnow() + timedelta(hours=3, minutes=30)
+    monkeypatch.setattr(freshness, "utcnow", lambda: almost)
+    with SessionLocal() as db:
+        db.add(
+            MarineWarningSnapshot(
+                issued_at=now,
+                fetched_at=almost,
+                active_json="[]",
+                preliminary_json="[]",
+                raw_active="",
+                raw_preliminary="",
+            )
+        )
+        db.commit()
+    body = client.get("/api/v1/meta/data-status").json()
+    assert body["stale"] is False
+
+    # 다른 테스트(특보 판정)에 영향이 없도록 이 테스트가 넣은 행을 지운다
+    from sqlalchemy import delete
+
+    with SessionLocal() as db:
+        db.execute(delete(MarineWarningSnapshot).where(MarineWarningSnapshot.raw_active == ""))
+        db.execute(delete(OceanReading).where(OceanReading.station_id == st_id))
+        db.execute(delete(Station).where(Station.id == st_id))
+        db.commit()
