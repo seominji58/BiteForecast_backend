@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UTCDateTime
@@ -18,6 +18,8 @@ class AppUser(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     device_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # 개발·검증용 사용자. 이 사용자의 글·사진은 일반 화면에서 숨긴다 (SHOW_TEST_DATA=true 면 보임)
+    is_test: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
     account: Mapped["Account | None"] = relationship(back_populates="user", uselist=False)
 

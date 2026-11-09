@@ -133,3 +133,21 @@ def test_favorites(client, places):
     assert [f["id"] for f in favs] == [places[1]]
     assert client.delete(f"/api/v1/me/favorites/{places[1]}", headers=h).status_code == 204
     assert client.get("/api/v1/me/favorites", headers=h).json() == []
+
+
+def test_test_users_are_hidden_from_others(client, places):
+    from app.core.db import SessionLocal
+    from app.models import Account, AppUser
+
+    h = signup(client)
+    p = post(client, h, title="테스트 사용자 글")
+    me = client.get("/api/v1/me/account", headers=h).json()
+    with SessionLocal() as db:
+        uid = db.get(Account, me["id"]).user_id
+        db.get(AppUser, uid).is_test = True
+        db.commit()
+    other_ids = [x["id"] for x in client.get(f"{URL}/posts").json()]
+    assert p["id"] not in other_ids  # 다른 사람(손님)에게는 안 보임
+    assert client.get(f"{URL}/posts/{p['id']}").status_code == 404
+    mine = [x["id"] for x in client.get(f"{URL}/posts", headers=h).json()]
+    assert p["id"] in mine  # 본인에게는 보임

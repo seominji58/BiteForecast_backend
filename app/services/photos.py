@@ -205,6 +205,11 @@ def can_view(db: Session, user: AppUser | None, p: Photo, is_admin: bool = False
         return False
     if is_admin or (user is not None and p.user_id == user.id):
         return True
+    # 테스트 사용자 사진은 다른 사람에게 보이지 않는다 (SHOW_TEST_DATA=true 제외)
+    if not get_settings().show_test_data:
+        owner = db.get(AppUser, p.user_id)
+        if owner is not None and owner.is_test:
+            return False
     if p.post_id is not None:
         post = db.get(Post, p.post_id)
         return post is not None and post.deleted_at is None and not post.hidden

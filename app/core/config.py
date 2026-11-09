@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # 로그인 유지 기간 (마지막 사용 후 이 기간이 지나면 다시 로그인)
     session_days: int = 60
 
+    # 테스트 사용자(app_user.is_test)의 글·사진을 일반 화면에 보일지. 개발 중 기능 확인할 때만 true
+    show_test_data: bool = False
+
     # 사진 인증 관리자 검토 (재설계 v2 §9). 비어 있으면 관리자 API·검토 화면을 막는다
     admin_token: str = ""
     # 촬영 시각(EXIF)과 출조 일시 차이가 이보다 크면 검토 화면에 「확인 필요」 표시 (자동 반려 아님)

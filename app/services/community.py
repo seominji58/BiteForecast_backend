@@ -75,9 +75,16 @@ def _authors(db: Session, user_ids: set[int]) -> dict[int, AuthorOut]:
     }
 
 
+def _test_user_ids():
+    return select(AppUser.id).where(AppUser.is_test.is_(True))
+
+
 def _visible_posts(user: AppUser):
-    """삭제되지 않았고, 숨김이 아니거나 내 글"""
-    return select(Post).where(Post.deleted_at.is_(None), (Post.hidden.is_(False)) | (Post.user_id == user.id))
+    """삭제되지 않았고, 숨김이 아니거나 내 글. 테스트 사용자 글은 일반 화면에서 뺀다 (내 글이면 보임)"""
+    stmt = select(Post).where(Post.deleted_at.is_(None), (Post.hidden.is_(False)) | (Post.user_id == user.id))
+    if not get_settings().show_test_data:
+        stmt = stmt.where(Post.user_id.not_in(_test_user_ids()) | (Post.user_id == user.id))
+    return stmt
 
 
 def _counts(db: Session, post_ids: list[int]) -> tuple[dict[int, int], dict[int, int]]:
