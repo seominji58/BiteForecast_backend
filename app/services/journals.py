@@ -11,7 +11,7 @@ from app.models import AppUser, Journal, Place, Post, Species
 from app.models.base import utcnow
 from app.models.enums import PhotoPurpose
 from app.schemas.journal import EnvSnapshotOut, JournalIn, JournalMutationOut, JournalOut, VerificationOut
-from app.services import photos, verification
+from app.services import photos, trips, verification
 from app.services.envlink import link_environment
 from app.services.points import recompute_points
 from app.services.titles import get_my_title
@@ -65,6 +65,7 @@ def to_out(db: Session, j: Journal) -> JournalOut:
             missing=missing,
         ),
         shared_post_id=shared,
+        trip_stop_id=j.trip_stop_id,
         created_at=j.created_at,
         updated_at=j.updated_at,
         env_snapshots=[EnvSnapshotOut.model_validate(s) for s in j.env_snapshots],
@@ -126,6 +127,8 @@ def _reload(db: Session, j: Journal) -> None:
 
 def create_journal(db: Session, user: AppUser, data: JournalIn) -> JournalMutationOut:
     _validate_refs(db, data)
+    if data.trip_stop_id is not None:
+        trips.owned_stop_for_journal(db, user, data.trip_stop_id, data.place_id)
     j = Journal(user_id=user.id, **data.model_dump(exclude=_FORM_ONLY))
     db.add(j)
     db.flush()
@@ -140,7 +143,11 @@ def create_journal(db: Session, user: AppUser, data: JournalIn) -> JournalMutati
 def update_journal(db: Session, user: AppUser, journal_id: int, data: JournalIn) -> JournalMutationOut:
     j = get_owned(db, user, journal_id)
     _validate_refs(db, data)
+    if data.trip_stop_id is not None and data.trip_stop_id != j.trip_stop_id:
+        trips.owned_stop_for_journal(db, user, data.trip_stop_id, data.place_id)
     values = data.model_dump(exclude=_FORM_ONLY)
+    if data.trip_stop_id is None:
+        values.pop("trip_stop_id")  # 보내지 않으면 기존 연결 유지
     env_changed = any(getattr(j, f) != values[f] for f in _ENV_FIELDS)
     content_changed = any(getattr(j, f) != values[f] for f in verification.VERIFY_FIELDS)
     for k, v in values.items():

@@ -7,6 +7,7 @@ from app.models.photo import Photo
 from app.models.place import Place, PlaceInfo, PlaceStation, Region, Species, Station
 from app.models.points import PointLedger, Title
 from app.models.regulation import RegulationReport, Restriction
+from app.models.trip import TripChecklistItem, TripPlan, TripStop
 from app.models.user import Account, AppUser, AuthSession, Favorite
 
 __all__ = [
@@ -37,4 +38,7 @@ __all__ = [
     "TideExtreme",
     "TideForecast",
     "Title",
+    "TripChecklistItem",
+    "TripPlan",
+    "TripStop",
 ]

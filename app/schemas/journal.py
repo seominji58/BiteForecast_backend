@@ -25,6 +25,8 @@ class JournalIn(BaseModel):
     memo: str | None = Field(default=None, max_length=1000)
     # 업로드해 둔 사진 ID (순서 = 표시 순서). None 이면 사진 변경 없음, [] 이면 모두 뺌
     photo_ids: list[int] | None = Field(default=None, max_length=10)
+    # 출조계획의 장소에서 쓴 기록이면 그 장소 ID (본인 계획·같은 낚시터만)
+    trip_stop_id: int | None = None
     # 「저장하고 인증 신청」: 저장과 함께 인증 검토를 신청 (사진 1장 이상·어종 필요)
     request_verification: bool = False
 
@@ -96,6 +98,8 @@ class JournalOut(BaseModel):
     verification: VerificationOut
     # 이 일지를 공유한 커뮤니티 글 (없으면 None)
     shared_post_id: int | None
+    # 출조계획 장소에서 쓴 기록이면 그 장소 ID
+    trip_stop_id: int | None = None
     created_at: datetime
     updated_at: datetime
     env_snapshots: list[EnvSnapshotOut]

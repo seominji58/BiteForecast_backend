@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ValueAt(BaseModel):
@@ -47,6 +47,8 @@ class PlaceSummaryOut(BaseModel):
     sea_group: Literal["서해", "남해", "동해", "제주"] | None = None
     # 다음(오늘) 또는 그날 첫 만조·간조 — 같은 바다 조위관측소 예보일 때만
     next_tide: TideEventOut | None = None
+    # 그날 만조·간조 전부 (같은 바다 조위관측소 예보일 때만). 전체 요약 응답에서는 빼서 보낸다
+    tides: list[TideEventOut] = Field(default_factory=list, exclude=True)
 
 
 class DataStatusOut(BaseModel):

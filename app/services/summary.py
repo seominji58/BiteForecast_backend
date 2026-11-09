@@ -85,6 +85,46 @@ def _sea_group(seas: list[str]) -> str | None:
     return None
 
 
+def summarize_place(db: Session, place: Place, day: date) -> PlaceSummaryOut:
+    """한 낚시터의 하루 요약 (전체 요약·출조계획 해황이 같이 쓴다)"""
+    after = utcnow() if day == today_kst() else None
+    pc = _place_compare(db, place, day)
+    wave_obs = _find(pc.series, "wave_height", "observed")
+    wind_obs = _find(pc.series, "wind_speed", "observed")
+    tide = next((x for x in pc.series if x.metric == "tide_extreme" and x.status == "ok"), None)
+    upcoming = [e for e in (tide.extremes or []) if after is None or e.t >= after] if tide else []
+    tides = (
+        [
+            TideEventOut(
+                type=e.type,
+                t=e.t,
+                v=e.v,
+                station_name=tide.source.station_name if tide.source else "",
+                station_km=tide.source.distance_km if tide.source else None,
+            )
+            for e in (tide.extremes or [])
+        ]
+        if tide
+        else []
+    )
+    return PlaceSummaryOut(
+        place_id=place.id,
+        location_suspect=pc.place.location_suspect,
+        sea_group=_sea_group(pc.warning.seas),
+        next_tide=next((t for t in tides if t.t == upcoming[0].t), None) if upcoming else None,
+        tides=tides,
+        warning_level=pc.warning.level,
+        warning_types=sorted({m.type for m in pc.warning.active}),
+        wave_obs=_latest(wave_obs),
+        wave_obs_km=wave_obs.source.distance_km if wave_obs and wave_obs.source else None,
+        wave_fc_max=_peak(_find(pc.series, "wave_height", "forecast"), after),
+        wind_obs=_latest(wind_obs),
+        wind_fc_max=_peak(_find(pc.series, "wind_speed", "forecast"), after),
+        temp_obs=_latest(_find(pc.series, "water_temp", "observed")),
+        index=_index(pc),
+    )
+
+
 def summarize(db: Session, day: date) -> list[PlaceSummaryOut]:
     hit = _cache.get(day)
     if hit and time.monotonic() - hit[0] < _TTL_SECONDS:
@@ -99,38 +139,6 @@ def summarize(db: Session, day: date) -> list[PlaceSummaryOut]:
             selectinload(Place.stations).selectinload(PlaceStation.station),
         )
     ).all()
-    after = utcnow() if day == today_kst() else None
-    out = []
-    for place in places:
-        pc = _place_compare(db, place, day)
-        wave_obs = _find(pc.series, "wave_height", "observed")
-        wind_obs = _find(pc.series, "wind_speed", "observed")
-        tide = next((x for x in pc.series if x.metric == "tide_extreme" and x.status == "ok"), None)
-        upcoming = [e for e in (tide.extremes or []) if after is None or e.t >= after] if tide else []
-        out.append(
-            PlaceSummaryOut(
-                place_id=place.id,
-                location_suspect=pc.place.location_suspect,
-                sea_group=_sea_group(pc.warning.seas),
-                next_tide=TideEventOut(
-                    type=upcoming[0].type,
-                    t=upcoming[0].t,
-                    v=upcoming[0].v,
-                    station_name=tide.source.station_name if tide.source else "",
-                    station_km=tide.source.distance_km if tide.source else None,
-                )
-                if upcoming
-                else None,
-                warning_level=pc.warning.level,
-                warning_types=sorted({m.type for m in pc.warning.active}),
-                wave_obs=_latest(wave_obs),
-                wave_obs_km=wave_obs.source.distance_km if wave_obs and wave_obs.source else None,
-                wave_fc_max=_peak(_find(pc.series, "wave_height", "forecast"), after),
-                wind_obs=_latest(wind_obs),
-                wind_fc_max=_peak(_find(pc.series, "wind_speed", "forecast"), after),
-                temp_obs=_latest(_find(pc.series, "water_temp", "observed")),
-                index=_index(pc),
-            )
-        )
+    out = [summarize_place(db, place, day) for place in places]
     _cache[day] = (time.monotonic(), out)
     return out

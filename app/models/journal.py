@@ -25,6 +25,8 @@ class Journal(TimestampMixin, Base):
     memo: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    # 출조계획의 장소에서 「기록 남기기」로 쓴 기록 (계획을 지우면 NULL)
+    trip_stop_id: Mapped[int | None] = mapped_column(ForeignKey("trip_stop.id", ondelete="SET NULL"))
 
     # 사진 인증 (재설계 v2 §9). 포인트는 approved 일지에서만 계산된다
     verification_status: Mapped[VerificationStatus] = mapped_column(

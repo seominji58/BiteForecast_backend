@@ -36,6 +36,9 @@ from app.models import (
     PointLedger,
     Post,
     PostLike,
+    TripChecklistItem,
+    TripPlan,
+    TripStop,
 )
 from app.models.base import utcnow
 from app.schemas.auth import AccountOut, Agreements, AuthOut, GoogleSignupNeeded, MergeInfo
@@ -394,6 +397,18 @@ def delete_account(db: Session, account: Account) -> None:
     )
     db.execute(delete(PostLike).where(PostLike.user_id == uid))
     db.execute(delete(Favorite).where(Favorite.user_id == uid))
+    # 출조계획은 본인만 보는 개인 자료 → 실제로 지운다 (장소·준비물은 FK CASCADE, 기록 연결은 SET NULL)
+    stop_ids = (
+        select(TripStop.id).join(TripPlan, TripPlan.id == TripStop.plan_id).where(TripPlan.user_id == uid)
+    )
+    db.execute(update(Journal).where(Journal.trip_stop_id.in_(stop_ids)).values(trip_stop_id=None))
+    db.execute(
+        delete(TripChecklistItem).where(
+            TripChecklistItem.plan_id.in_(select(TripPlan.id).where(TripPlan.user_id == uid))
+        )
+    )
+    db.execute(delete(TripStop).where(TripStop.id.in_(stop_ids)))
+    db.execute(delete(TripPlan).where(TripPlan.user_id == uid))
     db.execute(delete(PointLedger).where(PointLedger.user_id == uid))
     db.execute(update(AuthSession).where(AuthSession.account_id == account.id).values(revoked_at=now))
     placeholder = f"탈퇴회원{account.id}"

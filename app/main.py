@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from app.core import logsafe
 from app.core.config import get_settings
 from app.core.db import init_db
-from app.routers import admin, auth, community, compare, health, journals, me, photos, places
+from app.routers import admin, auth, community, compare, health, journals, me, photos, places, trips
 
 API_PREFIX = "/api/v1"
 
@@ -75,6 +75,7 @@ def _clean_msg(msg: str) -> str:
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(places.router, prefix=API_PREFIX)
 app.include_router(me.router, prefix=API_PREFIX)
+app.include_router(trips.router, prefix=API_PREFIX)
 
 app.include_router(journals.router, prefix=API_PREFIX)
 app.include_router(compare.router, prefix=API_PREFIX)
