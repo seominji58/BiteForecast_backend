@@ -179,6 +179,23 @@ def _location_check_out(db: Session, place: Place, day: date) -> PlaceCompareOut
     )
 
 
+def reference_warning(db: Session, place: Place) -> WarningOut:
+    """좌표 불일치 의심 곳의 특보: 등록 주소 기준 — 참고용.
+    실제 낚시 위치의 특보는 확인되지 않았으므로 「특보 없음」으로 표현하지 않는다
+    (주소 기준 none → unknown). 주소 기준 특보·예비특보가 있으면 그대로 알린다 (안전 쪽)."""
+    w = evaluate_warning(db, place)
+    w.reference_only = True
+    w.address_level = w.level
+    if w.level == "none":
+        w.level, w.reason = "unknown", "LOCATION_REVIEW"
+    w.note = (
+        f"참고용 — 등록 주소({place.region.name}) 기준 해역({'·'.join(w.seas) or '확인 불가'})의 특보예요. "
+        "실제 낚시 위치에 적용되는 특보는 아직 확인되지 않았어요. "
+        "주소 기준으로 특보가 없어도 실제 위치에 특보가 없다는 뜻은 아니에요."
+    )
+    return w
+
+
 def _location_review_out(db: Session, place: Place, day: date) -> PlaceCompareOut:
     """좌표 불일치 의심(C등급 유지·추천 보류): 좌표로 연결한 자료(파고·풍속 예보 격자, 부이, 조위관측소,
     바다낚시지수)는 판단을 보류한다. 해상 특보는 등록 주소 기준이라 그대로 보여주되 한계를 함께 알린다"""
@@ -191,12 +208,7 @@ def _location_review_out(db: Session, place: Place, day: date) -> PlaceCompareOu
         series.append(_unavailable(metric.value, unit, DataKind.OBSERVED, reason))
         if metric in FORECAST_METRICS:
             series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
-    warning = evaluate_warning(db, place)
-    warning.note = (
-        f"특보는 등록 주소({place.region.name}) 기준 해역"
-        f"({'·'.join(warning.seas) or '확인 불가'})으로 연결했어요. "
-        "좌표가 주소와 다른 시·군에 있어 실제 낚시 위치가 다른 해역이면 그 해역 특보도 확인하세요."
-    )
+    warning = reference_warning(db, place)
     return PlaceCompareOut(
         place=place_out(db, place),
         region_name=place.region.name,

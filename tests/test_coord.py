@@ -188,7 +188,8 @@ def test_review_hold_place_withholds_coordinate_data_but_keeps_address_warning(c
     assert all(s["status"] == "unavailable" and s["reason"] == "LOCATION_REVIEW" for s in pc["series"])
     assert pc["fishing_index"]["reason"] == "LOCATION_REVIEW"
     assert pc["warning"]["reason"] != "LOCATION_CHECK" and pc["warning"]["basis"] == "address"
-    assert "등록 주소" in pc["warning"]["note"]
+    assert pc["warning"]["reference_only"] is True and "참고용" in pc["warning"]["note"]
+    assert "실제 낚시 위치에 적용되는 특보는 아직 확인되지 않았어요" in pc["warning"]["note"]
     assert pc["place"]["coord"]["grade"] == "C" and pc["place"]["location_suspect"] is False
 
     summary_service._cache.clear()
@@ -206,3 +207,51 @@ def test_review_hold_place_withholds_coordinate_data_but_keeps_address_warning(c
     o = client.get(f"/api/v1/me/trips/{t['id']}/outlook", headers=h).json()["stops"][0]
     assert o["forecast_status"] == "location_review" and o["wave_fc_max"] is None and o["tides"] == []
     assert o["warning_note"] and o["warning_is_current"] is True
+
+
+def test_reference_warning_never_says_none(client, place):
+    """주소 기준으로 특보가 없어도 「특보 없음」이 아니라 「확인 불가(참고)」. 수집이 오래되면 확인 불가"""
+
+    from app.models import MarineWarningSnapshot
+    from app.models.base import utcnow
+
+    _check(place, "C", None, "unknown")
+    with SessionLocal() as db:
+        db.add(
+            PlaceCoordCheck(
+                place_id=place,
+                grade="C",
+                location_type="unknown",
+                status="coord_mismatch_suspected",
+                method="vworld",
+                evidence="테스트",
+                batch="t-ref",
+            )
+        )
+        snap = MarineWarningSnapshot(
+            issued_at=utcnow(),
+            fetched_at=utcnow(),
+            active_json="[]",
+            preliminary_json="[]",
+            raw_active="",
+            raw_preliminary="",
+        )
+        db.add(snap)
+        db.commit()
+        snap_id = snap.id
+    try:
+        day = str(today_kst())
+        w = client.get(f"/api/v1/places/{place}/conditions", params={"date": day}).json()["place"]["warning"]
+        assert w["address_level"] == "none" and w["level"] == "unknown" and w["reason"] == "LOCATION_REVIEW"
+        summary_service._cache.clear()
+        s = next(
+            x
+            for x in client.get(f"/api/v1/places-summary?date={day}").json()["places"]
+            if x["place_id"] == place
+        )
+        assert s["warning_level"] == "unknown"  # 지도·목록에도 「특보 없음」으로 나오지 않음
+    finally:
+        with SessionLocal() as db:
+            db.delete(db.get(MarineWarningSnapshot, snap_id))
+            db.commit()
+        summary_service._cache.clear()

@@ -113,7 +113,7 @@ class WarningOut(BaseModel):
     """기상청 해상 특보 (공식 발표). level=unknown 이면 「특보 없음」으로 표시하지 않는다"""
 
     level: Literal["warning", "nearby", "preliminary", "none", "unknown"]
-    reason: Literal["NO_DATA", "UNKNOWN_SEA", "LOCATION_CHECK"] | None = None
+    reason: Literal["NO_DATA", "UNKNOWN_SEA", "LOCATION_CHECK", "LOCATION_REVIEW"] | None = None
     seas: list[str] = []  # 이 장소에 적용한 바다 (예: 서해중부)
     active: list[WarningMatchOut] = []
     preliminary: list[WarningMatchOut] = []
@@ -124,6 +124,10 @@ class WarningOut(BaseModel):
     basis: Literal["address"] = "address"
     # 좌표 불일치 의심 곳: 주소 기준 특보의 한계 안내
     note: str | None = None
+    # 참고용(실제 낚시 위치의 특보는 확인 안 됨). True 면 level 의 「none」을 「unknown」으로 바꿔 내려준다
+    reference_only: bool = False
+    # 참고용일 때 주소 기준으로 본 원래 단계 (예: none — 화면에서 「주소 기준으로는 특보 없음(참고)」)
+    address_level: Literal["warning", "nearby", "preliminary", "none", "unknown"] | None = None
 
 
 class PlaceCompareOut(BaseModel):
