@@ -106,3 +106,30 @@ def test_popular_sort(client):
         x["id"] for x in client.get(f"{URL}/posts", params={"sort": "popular"}, headers=signup(client)).json()
     ]
     assert ids.index(hot["id"]) < ids.index(quiet["id"])
+
+
+def test_list_has_catch_region_and_filters(client, places):
+    h = signup(client)
+    a = post(client, h, place_id=places[0], species_code="black_porgy", title="지역 필터 글")
+    b = post(client, h, species_etc="쥐노래미", title="어종 직접 입력 글")
+    listed = client.get(f"{URL}/posts", headers=h).json()
+    item = next(x for x in listed if x["id"] == a["id"])
+    assert item["region_name"] == "테스트 해역" and item["place_id"] == places[0] and item["catch"] is None
+    only_sido = client.get(f"{URL}/posts", params={"sido": "테스트"}).json()
+    assert a["id"] in [x["id"] for x in only_sido] and b["id"] not in [x["id"] for x in only_sido]
+    by_code = client.get(f"{URL}/posts", params={"species": "black_porgy"}).json()
+    assert [x["id"] for x in by_code if x["id"] in (a["id"], b["id"])] == [a["id"]]
+    by_name = client.get(f"{URL}/posts", params={"species": "쥐노래미"}).json()
+    assert b["id"] in [x["id"] for x in by_name]
+
+
+def test_favorites(client, places):
+    h = signup(client)
+    assert client.get("/api/v1/me/favorites").status_code == 401
+    assert client.put(f"/api/v1/me/favorites/{places[1]}", headers=h).status_code == 204
+    assert client.put(f"/api/v1/me/favorites/{places[1]}", headers=h).status_code == 204  # 중복 무시
+    assert client.put("/api/v1/me/favorites/99999", headers=h).status_code == 404
+    favs = client.get("/api/v1/me/favorites", headers=h).json()
+    assert [f["id"] for f in favs] == [places[1]]
+    assert client.delete(f"/api/v1/me/favorites/{places[1]}", headers=h).status_code == 204
+    assert client.get("/api/v1/me/favorites", headers=h).json() == []

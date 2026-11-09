@@ -12,10 +12,10 @@ from datetime import timedelta
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import get_settings
-from app.models import Account, AppUser, Journal, Photo, Place, PointLedger, Species, Title
+from app.models import Account, AppUser, Journal, Photo, Place, PointLedger, Region, Species, Title
 from app.models.base import utcnow
 from app.models.community import Comment, ContentReport, Post, PostCategory, PostLike, ReportTarget
 from app.models.enums import PhotoPurpose, VerificationStatus
@@ -110,8 +110,12 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
     )
     authors = _authors(db, {p.user_id for p in posts})
     places = {
-        p.id: p.name
-        for p in db.scalars(select(Place).where(Place.id.in_({x.place_id for x in posts if x.place_id})))
+        p.id: p
+        for p in db.scalars(
+            select(Place)
+            .where(Place.id.in_({x.place_id for x in posts if x.place_id}))
+            .options(selectinload(Place.region))
+        )
     }
     species = {
         s.code: s.name_ko
@@ -124,6 +128,8 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
     for p in posts:
         body = " ".join(p.body.split())
         pics = _post_photos(db, p)
+        place = places.get(p.place_id) if p.place_id else None
+        j = _verified_journal(db, p)
         out.append(
             PostSummaryOut(
                 id=p.id,
@@ -131,7 +137,17 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
                 title=p.title,
                 excerpt=body[:EXCERPT_LEN] + ("…" if len(body) > EXCERPT_LEN else ""),
                 author=authors[p.user_id],
-                place_name=places.get(p.place_id) if p.place_id else None,
+                place_name=place.name if place else None,
+                place_id=place.id if place else None,
+                region_name=place.region.name if place else None,
+                catch=CatchOut(
+                    fished_at=j.fished_at,
+                    species_name=species_name(db, j.species_code, j.species_etc),
+                    count=j.count,
+                    max_length_cm=j.max_length_cm,
+                )
+                if j is not None
+                else None,
                 species_name=species.get(p.species_code) if p.species_code else p.species_etc,
                 like_count=likes.get(p.id, 0),
                 comment_count=comments.get(p.id, 0),
@@ -172,9 +188,23 @@ def _post_photos(db: Session, p: Post) -> list[Photo]:
 
 
 def list_posts(
-    db: Session, user: AppUser, category: PostCategory | None, sort: str, limit: int
+    db: Session,
+    user: AppUser,
+    category: PostCategory | None,
+    sort: str,
+    limit: int,
+    sido: str | None = None,
+    species: str | None = None,
 ) -> list[PostSummaryOut]:
     stmt = _visible_posts(user)
+    # 지역(시·도, 예: 「제주」 「충남」): 글에 태그한 낚시터의 지역 이름이 그 시·도로 시작
+    if sido:
+        sido = sido.strip()
+        in_sido = select(Place.id).join(Region).where((Region.name == sido) | Region.name.like(f"{sido} %"))
+        stmt = stmt.where(Post.place_id.in_(in_sido))
+    # 어종: 목록 어종 코드 또는 직접 입력한 어종 이름
+    if species:
+        stmt = stmt.where((Post.species_code == species) | (Post.species_etc == species))
     if category is not None:
         stmt = stmt.where(Post.category == category)
     limit = min(max(limit, 1), 100)
@@ -211,19 +241,10 @@ def get_post(db: Session, user: AppUser, post_id: int) -> PostDetailOut:
         .order_by(Comment.created_at, Comment.id)
     ).all()
     authors = _authors(db, {c.user_id for c in comments}) if comments else {}
-    j = _verified_journal(db, p)
     return PostDetailOut(
         **summary.model_dump(),
         body=p.body,
         photos=[photos.photo_out(x) for x in _post_photos(db, p)],
-        catch=CatchOut(
-            fished_at=j.fished_at,
-            species_name=species_name(db, j.species_code, j.species_etc),
-            count=j.count,
-            max_length_cm=j.max_length_cm,
-        )
-        if j is not None
-        else None,
         comments=[
             CommentOut(
                 id=c.id,

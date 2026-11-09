@@ -72,6 +72,10 @@ class PostSummaryOut(BaseModel):
     verified: bool
     photo_count: int
     thumb: PhotoOut | None
+    place_id: int | None
+    region_name: str | None  # 예: 「제주 제주시」
+    # 인증 조황 글의 조과 (인증 완료 기록에서 가져옴). 일반 글은 None
+    catch: CatchOut | None
 
 
 class CommentIn(BaseModel):
@@ -92,7 +96,6 @@ class PostDetailOut(PostSummaryOut):
     body: str
     comments: list[CommentOut]
     photos: list[PhotoOut]
-    catch: CatchOut | None
 
 
 class LikeOut(BaseModel):

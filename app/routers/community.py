@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, DbSession, Reader
 from app.models.community import PostCategory
@@ -25,8 +25,11 @@ def list_posts(
     category: PostCategory | None = None,
     sort: Literal["latest", "popular"] = "latest",
     limit: int = 30,
+    sido: Annotated[str | None, Query(max_length=10)] = None,
+    species: Annotated[str | None, Query(max_length=50)] = None,
 ):
-    return svc.list_posts(db, user, category, sort, limit)
+    """글 목록. sido(예: 제주)·species(어종 코드 또는 이름)로 거를 수 있다"""
+    return svc.list_posts(db, user, category, sort, limit, sido, species)
 
 
 @router.post("/posts", response_model=PostDetailOut, status_code=status.HTTP_201_CREATED)
