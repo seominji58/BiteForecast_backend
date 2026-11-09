@@ -1,18 +1,13 @@
 """사진 업로드·EXIF 제거·접근 권한·관리자 검토·인증 기록 공유 (재설계 v2 §7, §9)"""
 
 import io
-import uuid
 
 from PIL import Image
 
-from tests.conftest import ADMIN, make_jpeg, upload
+from tests.conftest import ADMIN, make_jpeg, signup, upload
 
 J = "/api/v1/journals"
 P = "/api/v1/community/posts"
-
-
-def new_device() -> dict:
-    return {"X-Device-Id": str(uuid.uuid4())}
 
 
 def journal(client, device, place_id, **kw) -> dict:
@@ -51,7 +46,7 @@ def test_upload_validation(client, device):
 
 def test_private_photo_access(client, device, places):
     ph = upload(client, device)
-    other = new_device()
+    other = signup(client)
     client.get("/api/v1/me/title", headers=other)  # 다른 사용자 생성
     assert client.get(f"/api/v1{ph['url']}", headers=device).status_code == 200
     assert client.get(f"/api/v1{ph['url']}", headers=other).status_code == 404
@@ -108,7 +103,7 @@ def test_post_with_photos_visible_to_others(client, device, places):
     assert [x["id"] for x in post["photos"]] == [b["id"], a["id"]]
     assert post["species_name"] == "쥐노래미" and post["verified"] is False and post["catch"] is None
 
-    other = new_device()
+    other = signup(client)
     listed = client.get(P, headers=other).json()
     mine = next(x for x in listed if x["id"] == post["id"])
     assert mine["photo_count"] == 2 and mine["thumb"]["id"] == b["id"]
@@ -133,7 +128,7 @@ def test_precheck_flags_are_reference_only(client, device, places):
         client, device, places[0], species_code="rockfish", photo_ids=[ph1["id"]], request_verification=True
     )
     # 같은 원본을 다른 사람이 다른 기록에 사용
-    other = new_device()
+    other = signup(client)
     ph2 = upload(client, other, data=raw)
     j2 = journal(
         client, other, places[0], species_code="rockfish", photo_ids=[ph2["id"]], request_verification=True
@@ -186,7 +181,7 @@ def test_share_verified_journal(client, device, places):
     # 공유해도 포인트는 그대로 (지급 경로는 일지 하나)
     assert client.get("/api/v1/me/points", headers=device).json()["total_points"] == pts
     # 공유된 인증 사진은 다른 사람도 볼 수 있다
-    other = new_device()
+    other = signup(client)
     assert client.get(f"/api/v1/photos/{ph['id']}", headers=other).status_code == 200
     # 같은 기록 중복 공유 불가
     assert client.post(P, json=share, headers=device).status_code == 409

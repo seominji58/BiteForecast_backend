@@ -1,56 +1,74 @@
 import hmac
-import uuid
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
-from app.models import AppUser
+from app.models import Account, AppUser
+from app.services.auth import resolve_session
 
 DbSession = Annotated[Session, Depends(get_db)]
 
+# 로그인하지 않은 사람 (읽기 전용). DB 에 없는 임시 객체라 id 0 은 어떤 글·기록과도 일치하지 않는다
+GUEST_ID = 0
 
-def get_current_user(
+
+def _bearer(authorization: str | None) -> str | None:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    return None
+
+
+def get_account(
     db: DbSession,
-    x_device_id: Annotated[str | None, Header()] = None,
-) -> AppUser:
-    """X-Device-Id 헤더(UUID)로 사용자 식별. 처음 보는 기기면 사용자 생성 (명세 D-2)"""
-    if not x_device_id:
-        raise HTTPException(status_code=401, detail="X-Device-Id 헤더가 필요합니다")
-    try:
-        device_id = str(uuid.UUID(x_device_id))
-    except ValueError:
-        raise HTTPException(status_code=401, detail="X-Device-Id 형식이 올바르지 않습니다") from None
+    authorization: Annotated[str | None, Header()] = None,
+) -> Account | None:
+    token = _bearer(authorization)
+    return resolve_session(db, token) if token else None
 
-    user = db.scalar(select(AppUser).where(AppUser.device_id == device_id))
-    if user is None:
-        user = AppUser(device_id=device_id)
-        db.add(user)
-        db.commit()
-    return user
+
+OptionalAccount = Annotated[Account | None, Depends(get_account)]
+
+
+def require_account(account: OptionalAccount) -> Account:
+    if account is None:
+        raise HTTPException(
+            status_code=401,
+            detail="로그인이 필요해요",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return account
+
+
+CurrentAccount = Annotated[Account, Depends(require_account)]
+
+
+def get_current_user(account: CurrentAccount) -> AppUser:
+    """쓰기(기록·사진·글·댓글·좋아요·신고·포인트)는 로그인 필요 (2026-11-09 결정)"""
+    return account.user
 
 
 CurrentUser = Annotated[AppUser, Depends(get_current_user)]
 
 
-def get_optional_user(
-    db: DbSession,
-    x_device_id: Annotated[str | None, Header()] = None,
-) -> AppUser | None:
-    """사진 보기처럼 기기 ID 없이도 요청할 수 있는 곳용. 처음 보는 기기여도 사용자를 만들지 않는다"""
-    if not x_device_id:
-        return None
-    try:
-        device_id = str(uuid.UUID(x_device_id))
-    except ValueError:
-        return None
-    return db.scalar(select(AppUser).where(AppUser.device_id == device_id))
+def get_optional_user(account: OptionalAccount) -> AppUser | None:
+    return account.user if account is not None else None
 
 
 OptionalUser = Annotated[AppUser | None, Depends(get_optional_user)]
+
+
+def get_reader(account: OptionalAccount) -> AppUser:
+    """읽기 전용 화면용: 로그인했으면 그 사용자, 아니면 임시 손님 (liked·mine 은 항상 false)"""
+    return account.user if account is not None else AppUser(id=GUEST_ID, device_id="guest")
+
+
+Reader = Annotated[AppUser, Depends(get_reader)]
+
+# 로그인 없이 쓰던 기기 기록을 계정으로 옮길 때만 쓴다
+DeviceId = Annotated[str | None, Header(alias="X-Device-Id")]
 
 
 def is_admin_token(token: str | None) -> bool:

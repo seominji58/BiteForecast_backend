@@ -18,7 +18,7 @@ from app.models import AppUser, Journal
 from app.models.enums import VerificationStatus
 from app.schemas.photo import PhotoOut
 from app.services import photos, verification
-from app.services.community import nickname
+from app.services.community import nicknames
 from app.services.journals import species_name
 from app.services.points import recompute_points
 
@@ -63,7 +63,7 @@ class RejectIn(BaseModel):
 def _item(db, j: Journal) -> ReviewItem:
     return ReviewItem(
         journal_id=j.id,
-        author=nickname(j.user_id),
+        author=nicknames(db, {j.user_id})[j.user_id],
         place_name=j.place.name,
         fished_at=j.fished_at,
         species_name=species_name(db, j.species_code, j.species_etc),

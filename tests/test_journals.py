@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from app.core.db import SessionLocal
 from app.models import PlaceStation, Station, TideForecast
 from app.models.enums import StationKind, StationRole
-from tests.conftest import ADMIN, upload
+from tests.conftest import ADMIN, signup, upload
 
 URL = "/api/v1/journals"
 
@@ -37,7 +37,7 @@ def test_create_and_list(client, device, places):
 
 def test_other_user_cannot_see_journal(client, device, places):
     j = create(client, device, place_id=places[0])["journal"]
-    other = {"X-Device-Id": "00000000-0000-4000-8000-000000000000"}
+    other = signup(client)
     assert client.get(f"{URL}/{j['id']}", headers=other).status_code == 404
     assert client.delete(f"{URL}/{j['id']}", headers=other).status_code == 404
 

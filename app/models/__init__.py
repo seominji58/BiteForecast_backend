@@ -7,11 +7,13 @@ from app.models.photo import Photo
 from app.models.place import Place, PlaceInfo, PlaceStation, Region, Species, Station
 from app.models.points import PointLedger, Title
 from app.models.regulation import RegulationReport, Restriction
-from app.models.user import AppUser, Favorite
+from app.models.user import Account, AppUser, AuthSession, Favorite
 
 __all__ = [
     "Base",
+    "Account",
     "AppUser",
+    "AuthSession",
     "Comment",
     "ContentReport",
     "Favorite",

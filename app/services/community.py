@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models import AppUser, Journal, Photo, Place, PointLedger, Species, Title
+from app.models import Account, AppUser, Journal, Photo, Place, PointLedger, Species, Title
 from app.models.base import utcnow
 from app.models.community import Comment, ContentReport, Post, PostCategory, PostLike, ReportTarget
 from app.models.enums import PhotoPurpose, VerificationStatus
@@ -47,7 +47,16 @@ POPULAR_WINDOW = timedelta(days=30)
 
 
 def nickname(user_id: int) -> str:
+    """로그인 없이 쓰던 사용자 표시명"""
     return f"낚시인{user_id:04d}"
+
+
+def nicknames(db: Session, user_ids: set[int]) -> dict[int, str]:
+    """작성자 표시명: 계정 닉네임, 계정이 없으면 「낚시인0012」"""
+    names = dict(
+        db.execute(select(Account.user_id, Account.nickname).where(Account.user_id.in_(user_ids))).all()
+    )
+    return {uid: names.get(uid) or nickname(uid) for uid in user_ids}
 
 
 def _authors(db: Session, user_ids: set[int]) -> dict[int, AuthorOut]:
@@ -59,8 +68,9 @@ def _authors(db: Session, user_ids: set[int]) -> dict[int, AuthorOut]:
             .group_by(PointLedger.user_id)
         ).all()
     )
+    names = nicknames(db, user_ids)
     return {
-        uid: AuthorOut(nickname=nickname(uid), title=resolve_title(totals.get(uid, 0), titles).current.name)
+        uid: AuthorOut(nickname=names[uid], title=resolve_title(totals.get(uid, 0), titles).current.name)
         for uid in user_ids
     }
 

@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     # 업로드 후 일지·글에 연결되지 않은 사진은 이 시간이 지나면 정리 대상
     photo_orphan_hours: int = 24
 
+    # 로그인: 구글 OAuth 클라이언트 ID (iOS·Android·Web, 쉼표로 구분). 비어 있으면 구글 로그인 비활성
+    google_client_ids: str = ""
+    # 로그인 유지 기간 (마지막 사용 후 이 기간이 지나면 다시 로그인)
+    session_days: int = 60
+
     # 사진 인증 관리자 검토 (재설계 v2 §9). 비어 있으면 관리자 API·검토 화면을 막는다
     admin_token: str = ""
     # 촬영 시각(EXIF)과 출조 일시 차이가 이보다 크면 검토 화면에 「확인 필요」 표시 (자동 반려 아님)

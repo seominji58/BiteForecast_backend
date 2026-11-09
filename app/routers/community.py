@@ -2,7 +2,7 @@ from typing import Literal
 
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, Reader
 from app.models.community import PostCategory
 from app.schemas.community import (
     CommentIn,
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/community", tags=["community"])
 
 @router.get("/posts", response_model=list[PostSummaryOut])
 def list_posts(
-    user: CurrentUser,
+    user: Reader,
     db: DbSession,
     category: PostCategory | None = None,
     sort: Literal["latest", "popular"] = "latest",
@@ -35,7 +35,7 @@ def create_post(data: PostIn, user: CurrentUser, db: DbSession):
 
 
 @router.get("/posts/{post_id}", response_model=PostDetailOut)
-def get_post(post_id: int, user: CurrentUser, db: DbSession):
+def get_post(post_id: int, user: Reader, db: DbSession):
     return svc.get_post(db, user, post_id)
 
 

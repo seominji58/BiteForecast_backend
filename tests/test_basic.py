@@ -1,7 +1,6 @@
-import uuid
-
 from app.models import Title
 from app.services.titles import resolve_title
+from tests.conftest import signup
 
 TITLES = [
     Title(name="입문", min_points=0, sort_order=0),
@@ -18,14 +17,14 @@ def test_health(client):
     assert res.json()["status"] == "ok"
 
 
-def test_me_requires_device_id(client):
+def test_me_requires_login(client):
     res = client.get("/api/v1/me/title")
     assert res.status_code == 401
     assert res.json()["error"]["code"] == "UNAUTHORIZED"
 
 
 def test_new_user_starts_at_first_title(client):
-    res = client.get("/api/v1/me/title", headers={"X-Device-Id": str(uuid.uuid4())})
+    res = client.get("/api/v1/me/title", headers=signup(client))
     assert res.status_code == 200
     body = res.json()
     assert body["total_points"] == 0

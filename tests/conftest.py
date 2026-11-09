@@ -33,10 +33,29 @@ def places(client) -> list[int]:
         return [p.id for p in region.places]
 
 
+AGREE = {"over_14": True, "terms": True, "privacy": True}
+
+
+def signup(client, device_id: str | None = None, **kw) -> dict:
+    """새 회원(이메일 가입)으로 로그인한 요청 헤더. 기기 ID 도 함께 보낸다"""
+    device_id = device_id or str(uuid.uuid4())
+    tag = uuid.uuid4().hex[:10]
+    body = {
+        "email": f"u{tag}@test.kr",
+        "password": "fish1234",
+        "nickname": f"t{tag}",
+        "agreements": AGREE,
+        **kw,
+    }
+    res = client.post("/api/v1/auth/signup", json=body, headers={"X-Device-Id": device_id})
+    assert res.status_code == 201, res.text
+    return {"Authorization": f"Bearer {res.json()['token']}", "X-Device-Id": device_id}
+
+
 @pytest.fixture()
-def device():
-    """새 사용자 = 새 기기 ID"""
-    return {"X-Device-Id": str(uuid.uuid4())}
+def device(client):
+    """새 회원으로 로그인한 헤더 (테스트마다 새 사용자)"""
+    return signup(client)
 
 
 ADMIN = {"X-Admin-Token": "test-admin-token"}
