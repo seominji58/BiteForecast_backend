@@ -22,6 +22,11 @@ from app.services.warning import sea_keywords
 # 가거도·먼바다 포인트처럼 원래 먼 곳을 잘못 잡는다 → 시·도 단위 이웃 비교로 판단.
 SUSPECT_KM = 60.0
 
+# 규칙으로 못 잡는(같은 시·도 안에서 틀린) 좌표를 사람이 확인해 넣는 목록. DB 좌표는 그대로 둔다.
+# 176 창리해상낚시터: 주소는 서산시 부석면 창리 지선인데 원본 좌표가 보령 앞바다
+#   (2026-11-09 보고서 docs/03_데이터/2026-11-09_서산_낚시터_좌표_보정_후보.md, 사용자 승인)
+MANUAL_CHECK_IDS: frozenset[int] = frozenset({176})
+
 
 def _km(a_lat: float, a_lon: float, b_lat: float, b_lon: float) -> float:
     r = math.pi / 180
@@ -62,14 +67,14 @@ def _suspects_cached(version: tuple[int, int]) -> frozenset[int]:
 def suspect_place_ids(db: Session) -> frozenset[int]:
     """좌표가 의심되는 낚시터 ID (낚시터 목록이 바뀌면 다시 계산)"""
     version = db.execute(select(func.count(Place.id), func.max(Place.id))).one()
-    return _suspects_cached((int(version[0]), int(version[1] or 0)))
+    return _suspects_cached((int(version[0]), int(version[1] or 0))) | MANUAL_CHECK_IDS
 
 
 @lru_cache(maxsize=4)
 def _station_seas_cached(version: tuple[int, int, int]) -> dict[int, frozenset[str]]:
     from app.core.db import SessionLocal
 
-    suspects = _suspects_cached(version[:2])
+    suspects = _suspects_cached(version[:2]) | MANUAL_CHECK_IDS
     with SessionLocal() as db:
         places = [
             p
