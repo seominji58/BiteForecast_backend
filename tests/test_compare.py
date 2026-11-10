@@ -207,6 +207,12 @@ def fishing_setup(client, setup):
                         species=species,
                         index=idx,
                         tide_phase="소조기",
+                        min_wave_m=0.5,
+                        max_wave_m=1.0,
+                        min_water_temp=15.2,
+                        max_water_temp=16.1,
+                        min_wind_ms=2.0,
+                        max_wind_ms=4.5,
                         fetched_at=now,
                     )
                 )
@@ -225,6 +231,16 @@ def test_fishing_index_official_value_and_too_far(client, fishing_setup):
     assert [p["period"] for p in fa["periods"]] == ["오전", "오후"]  # 시간대 순서
     assert [i["species"] for i in fa["periods"][0]["items"]] == ["감성돔", "기타어종"]  # 기타는 뒤로
     assert fa["periods"][0]["items"][0]["index"] == "좋음"  # 기관 발표값 그대로
+    assert fa["periods"][0]["items"][0] == {
+        "species": "감성돔",
+        "index": "좋음",
+        "min_wave_m": 0.5,
+        "max_wave_m": 1.0,
+        "min_water_temp": 15.2,
+        "max_water_temp": 16.1,
+        "min_wind_ms": 2.0,
+        "max_wind_ms": 4.5,
+    }
 
     fb = b["fishing_index"]
     assert fb["status"] == "unavailable" and fb["reason"] == "TOO_FAR"
@@ -314,7 +330,9 @@ def test_fishing_index_species_dash_shown_as_common(client):
         "fishing_index"
     ]
     assert f["status"] == "ok"
-    assert f["periods"][0]["items"] == [{"species": "어종 공통", "index": "보통"}]
+    assert f["periods"][0]["items"][0]["species"] == "어종 공통"
+    assert f["periods"][0]["items"][0]["index"] == "보통"
+    assert f["periods"][0]["items"][0]["min_wave_m"] is None
 
 
 def test_places_summary(client, places):

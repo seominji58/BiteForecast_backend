@@ -10,3 +10,4 @@ uploads/
 .DS_Store
 backups/
 media/
+runtime/

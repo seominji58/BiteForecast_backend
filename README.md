@@ -18,8 +18,14 @@ cp .env.example .env   # DATA_GO_KR_API_KEY, KMA_API_KEY 입력
 # 지원 장소·관측소 적재 (219곳: 신고 바다 낚시터 + 바다낚시지수 지점 + 수동 지정)
 python -m seeds.load
 
-# 공공 데이터 수집 (처음 1회는 수 분 소요, 이후에는 받은 자료를 건너뜀). 계속 갱신하려면 --loop
+# 공공 데이터 수집 (처음 1회는 수 분 소요, 이후에는 받은 자료를 건너뜀)
 python -m app.jobs.collect
+
+# 로컬에서 1시간 주기로 계속 수집. 예상 밖 오류는 1분·5분 뒤 재시도하고 다음 주기도 계속 실행
+python -m app.jobs.collect --loop
+
+# 마지막 완전 성공·일부 실패·최종 실패와 DB 자료별 신선도 확인
+python -m app.jobs.collect --status
 
 # 0.0.0.0 으로 열어야 같은 Wi-Fi 의 휴대폰(Expo Go)에서 접속 가능
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
@@ -29,6 +35,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 - 헬스체크: `GET /api/v1/health`
 - 사진 인증 관리자 화면: http://localhost:8001/api/v1/admin (`ADMIN_TOKEN` 필요)
 - DB 스키마가 바뀌어도 지울 필요 없다. 서버가 켜질 때 새 테이블·컬럼만 추가한다 (운영 전환 시 Alembic)
+- 수집기 상태는 `runtime/collector-status.json`에 원자적으로 기록되며 git에 포함하지 않는다. `--loop`는 로컬 터미널이
+  실행 중인 동안 유지되므로 재부팅 뒤에는 다시 시작해야 한다.
 
 | 환경변수 | 내용 |
 |---|---|

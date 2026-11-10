@@ -11,7 +11,8 @@
 
 실행:
   python -m app.jobs.collect           # 1회
-  python -m app.jobs.collect --loop    # 1시간마다 반복 (개발용)
+  python -m app.jobs.collect --loop    # 1시간마다 반복, 실패 시 재시도 (로컬용)
+  python -m app.jobs.collect --status  # 마지막 실행 결과 + DB 자료 신선도 확인
 """
 
 import argparse
@@ -32,6 +33,7 @@ from app.core import logsafe
 from app.core.config import get_settings
 from app.core.db import SessionLocal, init_db
 from app.core.timeutil import kst_day_range, today_kst
+from app.jobs.collector_status import read_status, write_status
 from app.models import (
     FishingIndex,
     Journal,
@@ -45,6 +47,7 @@ from app.models import (
 from app.models.base import utcnow
 from app.models.enums import DataKind, Metric, StationRole
 from app.services.envlink import link_environment
+from app.services.freshness import data_status
 
 log = logging.getLogger("collect")
 
@@ -53,6 +56,9 @@ BUOY_METRICS: list[tuple[Metric, str, str]] = [
     (Metric.WIND_SPEED, "m/s", "wind_speed_ms"),
     (Metric.WATER_TEMP, "°C", "water_temp_c"),
 ]
+
+RETRY_DELAYS_SECONDS = (60, 300)
+LOOP_INTERVAL_SECONDS = 3600
 
 
 def _mapped_stations(db: Session, role: StationRole) -> list[Station]:
@@ -366,22 +372,106 @@ def _handle_error(e: KhoaError, dataset: str, st: Station, day: date, stats: Cou
     stats[f"{dataset}_errors"] += 1
 
 
+def _has_errors(stats: Counter) -> bool:
+    return any(name.endswith("_errors") and count > 0 for name, count in stats.items())
+
+
+def run_cycle(
+    *,
+    collect=collect_once,
+    retry_delays: tuple[int, ...] = RETRY_DELAYS_SECONDS,
+    sleep=time.sleep,
+) -> tuple[str, Counter | None]:
+    """한 수집 주기를 실행한다. 예상 밖 예외도 재시도하고 상태 파일에 남긴다."""
+    previous = read_status()
+    started = utcnow()
+    base = {
+        **previous,
+        "state": "running",
+        "last_started_at": started.isoformat(),
+        "attempt": 0,
+    }
+    write_status(base)
+
+    for attempt in range(1, len(retry_delays) + 2):
+        write_status({**base, "attempt": attempt})
+        began = time.monotonic()
+        try:
+            stats = collect()
+        except Exception as exc:  # 최상위 보호막: 한 번의 예상 밖 오류로 --loop가 죽지 않게 한다
+            failed = utcnow()
+            state = {
+                **base,
+                "state": "retrying" if attempt <= len(retry_delays) else "failed",
+                "attempt": attempt,
+                "last_failure_at": failed.isoformat(),
+                "last_finished_at": failed.isoformat(),
+                "last_error": f"{type(exc).__name__}: {exc}",
+                "consecutive_failures": int(previous.get("consecutive_failures", 0)) + 1,
+                "duration_seconds": round(time.monotonic() - began, 1),
+            }
+            write_status(state)
+            log.error(
+                "수집 주기 실패 (%s/%s): %s",
+                attempt,
+                len(retry_delays) + 1,
+                logsafe.redact(f"{type(exc).__name__}: {exc}"),
+            )
+            if attempt > len(retry_delays):
+                return "failed", None
+            sleep(retry_delays[attempt - 1])
+            continue
+
+        finished = utcnow()
+        partial = _has_errors(stats)
+        state = {
+            **base,
+            "state": "partial" if partial else "success",
+            "attempt": attempt,
+            "last_finished_at": finished.isoformat(),
+            "last_completed_at": finished.isoformat(),
+            "last_error": "일부 데이터셋 수집 실패" if partial else None,
+            "consecutive_failures": 0 if not partial else int(previous.get("consecutive_failures", 0)) + 1,
+            "duration_seconds": round(time.monotonic() - began, 1),
+            "stats": dict(stats),
+        }
+        if not partial:
+            state["last_success_at"] = finished.isoformat()
+        write_status(state)
+        return state["state"], stats
+
+    raise AssertionError("unreachable")
+
+
+def print_status() -> None:
+    with SessionLocal() as db:
+        freshness = data_status(db).model_dump(mode="json")
+    print(json.dumps({"collector": read_status(), "data_freshness": freshness}, ensure_ascii=False, indent=2))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="공공 해양 데이터 수집")
     parser.add_argument("--loop", action="store_true", help="1시간마다 반복 실행")
+    parser.add_argument("--status", action="store_true", help="마지막 수집 실행과 데이터 신선도 출력")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     # 인증키가 로그에 남지 않게: httpx URL 로그 끔 + 모든 로그에서 키 문자열 가림 (NFR-03)
     logsafe.install()
 
     init_db()
+    if args.status:
+        print_status()
+        return
     while True:
         started = time.monotonic()
-        stats = collect_once()
-        log.info("수집 완료 (%.0fs): %s", time.monotonic() - started, dict(stats))
+        state, stats = run_cycle()
+        log.info("수집 주기 종료 state=%s (%.0fs): %s", state, time.monotonic() - started, dict(stats or {}))
         if not args.loop:
+            if state == "failed":
+                raise SystemExit(1)
             break
-        time.sleep(3600)
+        # 실패한 주기도 다음 정기 실행을 계속한다. 프로세스가 예외 한 번으로 종료되지 않는다.
+        time.sleep(LOOP_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":

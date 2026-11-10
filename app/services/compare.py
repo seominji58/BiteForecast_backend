@@ -368,7 +368,14 @@ def _fishing_index(db: Session, ps: PlaceStation | None, day: date) -> FishingIn
                 tide_phase=next((r.tide_phase for r in items if r.tide_phase), None),
                 items=[
                     FishingSpeciesOut(
-                        species=SPECIES_COMMON if r.species == "-" else r.species, index=r.index
+                        species=SPECIES_COMMON if r.species == "-" else r.species,
+                        index=r.index,
+                        min_wave_m=r.min_wave_m,
+                        max_wave_m=r.max_wave_m,
+                        min_water_temp=r.min_water_temp,
+                        max_water_temp=r.max_water_temp,
+                        min_wind_ms=r.min_wind_ms,
+                        max_wind_ms=r.max_wind_ms,
                     )
                     for r in sorted(items, key=lambda r: (r.species in _SPECIES_LAST, r.species))
                 ],

@@ -84,6 +84,13 @@ class RegulationOut(BaseModel):
 class FishingSpeciesOut(BaseModel):
     species: str
     index: str | None  # 매우좋음/좋음/보통/나쁨/매우나쁨 (기관 발표값 그대로)
+    # 지수와 함께 발표된 환경 범위. 앱이 계산한 조건이나 실측값이 아니다.
+    min_wave_m: float | None = None
+    max_wave_m: float | None = None
+    min_water_temp: float | None = None
+    max_water_temp: float | None = None
+    min_wind_ms: float | None = None
+    max_wind_ms: float | None = None
 
 
 class FishingPeriodOut(BaseModel):
