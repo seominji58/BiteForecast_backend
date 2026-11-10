@@ -50,7 +50,10 @@ class ExtremeOut(BaseModel):
 class SeriesOut(BaseModel):
     """한 지표의 한 종류(예보/실측) 자료. 예보와 실측은 서로 다른 계열로 분리한다 (TC-03)"""
 
-    metric: Literal["tide_extreme", "tide_level", "wave_height", "wind_speed", "water_temp"]
+    metric: Literal[
+        "tide_extreme", "tide_level", "wave_height", "wind_speed", "water_temp",
+        "air_temp", "precipitation_probability", "sky_state", "precipitation_type",
+    ]
     unit: str
     kind: DataKind
     status: SeriesStatus
@@ -120,6 +123,17 @@ class WarningOut(BaseModel):
     """기상청 해상 특보 (공식 발표). level=unknown 이면 「특보 없음」으로 표시하지 않는다"""
 
     level: Literal["warning", "nearby", "preliminary", "none", "unknown"]
+    # active: 이 장소 해역에 특보 발효 / nearby: 인근 특보·예비특보
+    # no_match: 다른 해역에만 특보 있음 / no_active_warnings: 발표된 해상 특보 없음
+    # unknown_sea: 이 장소의 적용 해역을 모름 (특보 없음과 다름)
+    # stale: 자료 만료 / collection_failed: 특보 API 수집 실패 / collector_failed: 수집기 주기 자체 실패
+    # never_collected: 받은 적 없음 / location_check: 좌표 의심으로 연결 안 함
+    status: Literal[
+        "active", "nearby", "no_match", "no_active_warnings", "unknown_sea",
+        "stale", "collection_failed", "collector_failed", "never_collected", "location_check",
+    ] = "never_collected"
+    # 자료 만료와 수집 실패는 동시에 성립할 수 있어 별도 문제 목록으로도 제공한다.
+    issues: list[Literal["stale", "collection_failed", "collector_failed"]] = []
     reason: Literal["NO_DATA", "UNKNOWN_SEA", "LOCATION_CHECK", "LOCATION_REVIEW"] | None = None
     seas: list[str] = []  # 이 장소에 적용한 바다 (예: 서해중부)
     active: list[WarningMatchOut] = []

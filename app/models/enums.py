@@ -38,6 +38,10 @@ class Metric(StrEnum):
     WAVE_HEIGHT = "wave_height"
     WIND_SPEED = "wind_speed"
     WATER_TEMP = "water_temp"
+    AIR_TEMP = "air_temp"
+    PRECIPITATION_PROBABILITY = "precipitation_probability"
+    SKY_STATE = "sky_state"
+    PRECIPITATION_TYPE = "precipitation_type"
 
 
 class TideExtremeType(StrEnum):

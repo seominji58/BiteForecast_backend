@@ -48,6 +48,19 @@ def _peak(s: SeriesOut | None, after: datetime | None) -> ValueAt | None:
     return best
 
 
+def _low(s: SeriesOut | None, after: datetime | None) -> ValueAt | None:
+    values = [p for p in (s.points or []) if p.v is not None and (after is None or p.t >= after)] if s else []
+    p = min(values, key=lambda x: x.v) if values else None
+    return ValueAt(v=round(p.v, 1), t=p.t) if p else None
+
+
+def _codes(s: SeriesOut | None, after: datetime | None) -> list[int]:
+    """기상청 PTY 코드 목록 (0=없음은 뺀다). 코드 의미는 바꾸지 않는다"""
+    if not s:
+        return []
+    return sorted({int(p.v) for p in (s.points or []) if p.v and p.v > 0 and (after is None or p.t >= after)})
+
+
 def _index(pc) -> IndexSummaryOut | None:
     f = pc.fishing_index
     if f.status != "ok" or not f.periods:
@@ -121,6 +134,10 @@ def summarize_place(db: Session, place: Place, day: date) -> PlaceSummaryOut:
         wind_obs=_latest(wind_obs),
         wind_fc_max=_peak(_find(pc.series, "wind_speed", "forecast"), after),
         temp_obs=_latest(_find(pc.series, "water_temp", "observed")),
+        air_temp_fc_min=_low(_find(pc.series, "air_temp", "forecast"), after),
+        air_temp_fc_max=_peak(_find(pc.series, "air_temp", "forecast"), after),
+        pop_fc_max=_peak(_find(pc.series, "precipitation_probability", "forecast"), after),
+        precipitation_types=_codes(_find(pc.series, "precipitation_type", "forecast"), after),
         index=_index(pc),
     )
 

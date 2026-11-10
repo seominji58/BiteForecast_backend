@@ -181,3 +181,71 @@ def test_account_delete_removes_trips(client, places):
         # 탈퇴한 계정의 사용자 ID 로 남은 계획이 없어야 한다
         uids = db.scalars(select(Account.user_id).where(Account.deleted_at.is_not(None))).all()
         assert db.scalar(select(func.count(TripPlan.id)).where(TripPlan.user_id.in_(uids))) == 0
+
+
+def test_outlook_weather_and_detail_range(client, device):
+    """TMP·POP·SKY·PTY 가 상세 API 와 출조계획 API 까지 전달된다.
+    결측은 0 으로 바꾸지 않고, 기상청 코드는 그대로, 예보가 하루를 다 덮지 않는 날은 「자료 없음」"""
+    from app.core.db import SessionLocal
+    from app.core.timeutil import kst_day_range
+    from app.models import OceanReading, Place, PlaceStation, Region, Station
+    from app.models.base import utcnow
+    from app.models.enums import DataKind, Metric, StationKind, StationRole
+
+    day = today_kst() + timedelta(days=1)
+    lo, _ = kst_day_range(day)
+    now = utcnow()
+    with SessionLocal() as db:
+        r = Region(name="충남 보령시")
+        p = Place(name="날씨-테스트", lat=36.3, lon=126.5)
+        r.places = [p]
+        grid = Station(provider="KMA", external_id="9,9", name="날씨 격자", kind=StationKind.KMA)
+        db.add_all([r, grid])
+        db.flush()
+        db.add(PlaceStation(place_id=p.id, role=StationRole.FORECAST, station_id=grid.id, distance_km=1.0))
+        # 내일 00~23시 + 모레 00시 한 점
+        for h in range(25):
+            t = lo + timedelta(hours=h)
+            vals = {
+                (Metric.WAVE_HEIGHT, "m"): 0.5,
+                (Metric.WIND_SPEED, "m/s"): 3.0,
+                # 10시 기온 결측
+                (Metric.AIR_TEMP, "°C"): None if h == 10 else 8.0 + h % 6,
+                (Metric.PRECIPITATION_PROBABILITY, "%"): 60.0 if h == 15 else 0.0,
+                (Metric.SKY_STATE, "code"): 4.0 if h >= 12 else 1.0,
+                # 0 없음 · 1 비 · 4 소나기
+                (Metric.PRECIPITATION_TYPE, "code"): 1.0 if h == 15 else 4.0 if h == 16 else 0.0,
+            }
+            for (metric, unit), v in vals.items():
+                db.add(OceanReading(station_id=grid.id, metric=metric, kind=DataKind.FORECAST, t=t, value=v,
+                                    unit=unit, issued_at=now, fetched_at=now))
+        db.commit()
+        pid = p.id
+
+    # 상세 API: 원 값·코드 그대로, 결측은 None
+    pc = client.get(f"/api/v1/places/{pid}/conditions", params={"date": str(day)}).json()["place"]
+    ser = {(s["metric"], s["kind"]): s for s in pc["series"]}
+    temp = ser[("air_temp", "forecast")]
+    assert temp["status"] == "ok" and len(temp["points"]) == 24
+    assert [x["v"] for x in temp["points"]][10] is None  # 0 으로 채우지 않음
+    assert {x["v"] for x in ser[("precipitation_type", "forecast")]["points"]} == {0.0, 1.0, 4.0}
+    assert {x["v"] for x in ser[("sky_state", "forecast")]["points"]} == {1.0, 4.0}
+
+    # 모레: 00시 한 점뿐 → 하루 예보처럼 보이지 않게 자료 없음
+    pc2 = client.get(f"/api/v1/places/{pid}/conditions", params={"date": str(day + timedelta(days=1))}).json()
+    ser2 = {(s["metric"], s["kind"]): s for s in pc2["place"]["series"]}
+    for m in ("air_temp", "precipitation_probability", "sky_state", "precipitation_type"):
+        x = ser2[(m, "forecast")]
+        assert x["status"] == "unavailable" and x["reason"] == "NO_DATA"
+
+    # 출조계획 API: 내일 계획 → 기온 최저·최고, 강수확률 최대, 강수형태(0 제외)
+    t = client.post(
+        URL,
+        json={"start_date": str(day), "end_date": str(day), "stops": [{"day": str(day), "place_id": pid}]},
+        headers=device,
+    ).json()
+    s = client.get(f"{URL}/{t['id']}/outlook", headers=device).json()["stops"][0]
+    assert s["forecast_status"] == "available"
+    assert s["air_temp_fc_min"]["v"] == 8.0 and s["air_temp_fc_max"]["v"] == 13.0
+    assert s["pop_fc_max"]["v"] == 60.0
+    assert s["precipitation_types"] == [1, 4]

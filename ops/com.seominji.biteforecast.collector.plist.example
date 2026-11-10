@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.seominji.biteforecast.collector</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/seominji/Desktop/BiteForecast/backend/.venv/bin/python</string>
+    <string>-m</string>
+    <string>app.jobs.collect</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/seominji/Desktop/BiteForecast/backend</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardOutPath</key>
+  <string>/Users/seominji/Desktop/BiteForecast/backend/runtime/collector.stdout.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/seominji/Desktop/BiteForecast/backend/runtime/collector.stderr.log</string>
+</dict>
+</plist>

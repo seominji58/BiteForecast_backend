@@ -407,6 +407,10 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
                 # 예보 범위 밖이면 일부만 있는 값(예: 다음 날 00시 한 점)도 쓰지 않는다
                 wave_fc_max=None if pending else sm.wave_fc_max,
                 wind_fc_max=None if pending else sm.wind_fc_max,
+                air_temp_fc_min=None if pending else sm.air_temp_fc_min,
+                air_temp_fc_max=None if pending else sm.air_temp_fc_max,
+                pop_fc_max=None if pending else sm.pop_fc_max,
+                precipitation_types=[] if pending else sm.precipitation_types,
                 warning_level=sm.warning_level,
                 warning_types=sm.warning_types,
                 warning_is_current=s.day == today,

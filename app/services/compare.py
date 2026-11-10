@@ -6,10 +6,10 @@
 - 보간하지 않는다. 원본 시각 그대로 내보낸다
 """
 
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.clients.khoa import (
@@ -57,6 +57,12 @@ OCEAN_METRICS: list[tuple[Metric, str]] = [
 ]
 # 기상청 단기예보로 예보를 제공하는 지표
 FORECAST_METRICS = {Metric.WAVE_HEIGHT, Metric.WIND_SPEED}
+WEATHER_FORECAST_METRICS: list[tuple[Metric, str]] = [
+    (Metric.AIR_TEMP, "°C"),
+    (Metric.PRECIPITATION_PROBABILITY, "%"),
+    (Metric.SKY_STATE, "code"),
+    (Metric.PRECIPITATION_TYPE, "code"),
+]
 
 
 def date_range() -> DateRangeOut:
@@ -156,6 +162,26 @@ def _forecast_series(db: Session, ps: PlaceStation | None, metric: Metric, unit:
     )
 
 
+def _weather_series(db: Session, ps: PlaceStation | None, metric: Metric, unit: str, lo, hi) -> SeriesOut:
+    """기온·강수확률·하늘·강수형태. 받아 둔 예보가 그날 마지막 시각(23시)까지 닿지 않으면
+    (예: 예보 범위 밖 날짜의 00시 한 점) 하루 예보처럼 보이지 않도록 「자료 없음」으로 낸다"""
+    out = _forecast_series(db, ps, metric, unit, lo, hi)
+    if out.status != "ok" or ps is None:
+        return out
+    last = db.scalar(
+        select(func.max(OceanReading.t)).where(
+            OceanReading.station_id == ps.station_id,
+            OceanReading.metric == metric,
+            OceanReading.kind == DataKind.FORECAST,
+        )
+    )
+    if last is not None and last.tzinfo is None:
+        last = last.replace(tzinfo=UTC)
+    if last is None or last < hi - timedelta(hours=1):
+        return _unavailable(metric.value, unit, DataKind.FORECAST, "NO_DATA", out.source)
+    return out
+
+
 def _location_check_out(db: Session, place: Place, day: date) -> PlaceCompareOut:
     """좌표가 의심되는 낚시터: 다른 지역 자료가 붙지 않도록 해황 자료를 연결하지 않는다"""
     reason = "LOCATION_CHECK"
@@ -167,13 +193,15 @@ def _location_check_out(db: Session, place: Place, day: date) -> PlaceCompareOut
         series.append(_unavailable(metric.value, unit, DataKind.OBSERVED, reason))
         if metric in FORECAST_METRICS:
             series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
+    for metric, unit in WEATHER_FORECAST_METRICS:
+        series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
     out = place_out(db, place)
     out.location_suspect = True
     return PlaceCompareOut(
         place=out,
         region_name=place.region.name,
         regulation=evaluate(db, place.id, day),
-        warning=WarningOut(level="unknown", reason="LOCATION_CHECK"),
+        warning=WarningOut(level="unknown", status="location_check", reason="LOCATION_CHECK"),
         fishing_index=FishingIndexOut(status="unavailable", reason=reason),
         series=series,
     )
@@ -208,6 +236,8 @@ def _location_review_out(db: Session, place: Place, day: date) -> PlaceCompareOu
         series.append(_unavailable(metric.value, unit, DataKind.OBSERVED, reason))
         if metric in FORECAST_METRICS:
             series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
+    for metric, unit in WEATHER_FORECAST_METRICS:
+        series.append(_unavailable(metric.value, unit, DataKind.FORECAST, reason))
     warning = reference_warning(db, place)
     return PlaceCompareOut(
         place=place_out(db, place),
@@ -324,6 +354,9 @@ def _place_compare(db: Session, place: Place, day: date) -> PlaceCompareOut:
         # 예보: 기상청 단기예보 격자 (실측 부이와 같은 위치). 실측과 별도 계열로 내보낸다 (TC-03)
         if metric in FORECAST_METRICS:
             series.append(_forecast_series(db, by_role.get(StationRole.FORECAST), metric, unit, lo, hi))
+
+    for metric, unit in WEATHER_FORECAST_METRICS:
+        series.append(_weather_series(db, by_role.get(StationRole.FORECAST), metric, unit, lo, hi))
 
     return PlaceCompareOut(
         place=place_out(db, place),

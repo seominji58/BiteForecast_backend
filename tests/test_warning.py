@@ -45,6 +45,12 @@ def test_parse():
     assert parse_active("o 없음\r\n") == []
 
 
+def _set_status(path, value):
+    from app.jobs import collector_status
+
+    collector_status.write_status(value, path)
+
+
 @pytest.fixture(scope="module")
 def warn_places(client):
     with SessionLocal() as db:
@@ -103,6 +109,132 @@ def test_levels(warn_places):
     # 바다를 알 수 없는 장소 → 「특보 없음」이 아니라 확인 불가
     unknown = _eval(warn_places["특보-미상"])
     assert unknown.level == "unknown" and unknown.reason == "UNKNOWN_SEA"
+    # 적용 해역을 모름은 「다른 해역에만 특보 있음(no_match)」과 다른 상태
+    assert unknown.status == "unknown_sea"
+    assert _eval(warn_places["특보-김녕"]).status == "active"
+    assert daecheon.status == "nearby" and busan.status == "nearby"
+
+
+def _with_snapshot(active, prelim, fn):
+    """잠시 더 최신 스냅샷을 넣고 판정한 뒤 지운다 (테스트용 메모리 DB)"""
+    with SessionLocal() as db:
+        snap = MarineWarningSnapshot(
+            issued_at=utcnow(),
+            fetched_at=utcnow() + timedelta(seconds=1),
+            active_json=json.dumps(active),
+            preliminary_json=json.dumps(prelim),
+            raw_active="",
+            raw_preliminary="",
+        )
+        db.add(snap)
+        db.commit()
+        sid = snap.id
+    try:
+        return fn()
+    finally:
+        with SessionLocal() as db:
+            db.delete(db.get(MarineWarningSnapshot, sid))
+            db.commit()
+
+
+def test_no_match_vs_no_active_vs_unknown_sea(warn_places):
+    jeju_only = [{"type": "풍랑주의보", "areas": ["제주도남쪽먼바다"]}]
+    # 다른 해역(제주)에만 특보 → 충남 장소는 no_match (level none 이지만 「특보 없음」과 구분)
+    w = _with_snapshot(jeju_only, [], lambda: _eval(warn_places["특보-대천"]))
+    assert w.level == "none" and w.status == "no_match"
+    # 발표된 해상 특보가 전혀 없음 → no_active_warnings
+    w = _with_snapshot([], [], lambda: _eval(warn_places["특보-대천"]))
+    assert w.level == "none" and w.status == "no_active_warnings"
+    # 해역을 모르는 장소는 특보가 하나도 없어도 「특보 없음」이 아니라 unknown_sea
+    w = _with_snapshot([], [], lambda: _eval(warn_places["특보-미상"]))
+    assert w.level == "unknown" and w.status == "unknown_sea"
+
+
+def _make_stale():
+    with SessionLocal() as db:
+        for s in db.query(MarineWarningSnapshot).all():
+            s.fetched_at = utcnow() - timedelta(hours=4)
+        db.commit()
+
+
+def _make_fresh():
+    with SessionLocal() as db:
+        for s in db.query(MarineWarningSnapshot).all():
+            s.fetched_at = utcnow()
+        db.commit()
+
+
+def test_stale_and_warning_collection_failed_together(warn_places, collector_file):
+    """자료 만료 + 특보 API 수집 실패가 동시에: 원인은 수집 실패, 문제 목록엔 둘 다"""
+    _set_status(collector_file, {
+        "state": "partial",
+        "stats": {"warning_errors": 1},
+        "warning_collection": {"ok": False, "at": utcnow().isoformat()},
+    })
+    _make_stale()
+    try:
+        w = _eval(warn_places["특보-대천"])
+        assert w.level == "unknown" and w.reason == "NO_DATA"
+        assert w.status == "collection_failed"
+        assert w.issues == ["stale", "collection_failed"]
+    finally:
+        _make_fresh()
+
+
+def test_collector_failure_is_not_warning_failure(warn_places, collector_file):
+    """수집기 주기 전체 실패(예: 조위 단계 예외)는 특보 API 실패로 보지 않는다"""
+    _set_status(collector_file, {
+        "state": "failed",
+        "stats": None,
+        # 마지막으로 특보를 실제로 호출했던 주기는 성공
+        "warning_collection": {"ok": True, "at": (utcnow() - timedelta(hours=5)).isoformat()},
+    })
+    _make_stale()
+    try:
+        w = _eval(warn_places["특보-대천"])
+        assert w.status == "collector_failed"
+        assert w.issues == ["stale", "collector_failed"]
+        assert "collection_failed" not in w.issues
+    finally:
+        _make_fresh()
+
+
+def test_old_failed_stats_are_not_read_as_current(warn_places, collector_file):
+    """이전 형식 상태 파일: 실패 주기에 남은 옛 통계의 warning_errors 는 특보 수집 실패로 보지 않는다"""
+    _set_status(collector_file, {"state": "failed", "stats": {"warning_errors": 3}})
+    _make_stale()
+    try:
+        w = _eval(warn_places["특보-대천"])
+        assert w.status == "collector_failed" and "collection_failed" not in w.issues
+    finally:
+        _make_fresh()
+    # 정상 종료(partial) 주기의 통계라면 특보 수집 실패
+    _set_status(collector_file, {"state": "partial", "stats": {"warning_errors": 1}})
+    w = _eval(warn_places["특보-대천"])
+    assert w.level == "preliminary" and w.issues == ["collection_failed"]
+
+
+def test_fresh_snapshot_after_failure_clears_failure(warn_places, collector_file):
+    """실패 기록보다 나중에 받은 스냅샷이 있으면 수집 실패로 보지 않는다"""
+    _set_status(collector_file, {
+        "state": "partial",
+        "warning_collection": {"ok": False, "at": (utcnow() - timedelta(hours=1)).isoformat()},
+    })
+    w = _eval(warn_places["특보-대천"])
+    assert w.status == "nearby" and w.issues == []
+
+
+def test_stale_only(warn_places, collector_file):
+    _set_status(collector_file, {
+        "state": "success",
+        "warning_collection": {"ok": True, "at": utcnow().isoformat()},
+    })
+    _make_stale()
+    try:
+        w = _eval(warn_places["특보-대천"])
+        assert w.status == "stale" and w.issues == ["stale"]
+    finally:
+        _make_fresh()
 
 
 def test_stale_snapshot_is_unknown(warn_places):

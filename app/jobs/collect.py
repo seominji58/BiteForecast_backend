@@ -16,8 +16,10 @@
 """
 
 import argparse
+import fcntl
 import json
 import logging
+import os
 import time
 from collections import Counter
 from dataclasses import asdict
@@ -33,7 +35,7 @@ from app.core import logsafe
 from app.core.config import get_settings
 from app.core.db import SessionLocal, init_db
 from app.core.timeutil import kst_day_range, today_kst
-from app.jobs.collector_status import read_status, write_status
+from app.jobs.collector_status import STATUS_PATH, read_status, write_status
 from app.models import (
     FishingIndex,
     Journal,
@@ -59,6 +61,8 @@ BUOY_METRICS: list[tuple[Metric, str, str]] = [
 
 RETRY_DELAYS_SECONDS = (60, 300)
 LOOP_INTERVAL_SECONDS = 3600
+GLOBAL_ERROR_CODES = {"01", "APPLICATION_ERROR"}
+GLOBAL_ERROR_LIMIT = 3
 
 
 def _mapped_stations(db: Session, role: StationRole) -> list[Station]:
@@ -238,12 +242,21 @@ def _collect_forecast(
     """기상청 단기예보(파고·풍속). 격자 코드 'nx,ny'. 새 발표가 덮는 시각 이후의 예보를 교체한다"""
     if "kma_forecast" in disabled:
         return
-    latest = db.scalar(
-        select(func.max(OceanReading.issued_at)).where(
-            OceanReading.station_id == st.id, OceanReading.kind == DataKind.FORECAST
-        )
+    expected_metrics = (
+        Metric.WAVE_HEIGHT, Metric.WIND_SPEED, Metric.AIR_TEMP, Metric.PRECIPITATION_PROBABILITY,
+        Metric.SKY_STATE, Metric.PRECIPITATION_TYPE,
     )
-    if latest is not None and latest >= base:
+    latest_by_metric = {
+        metric: db.scalar(
+            select(func.max(OceanReading.issued_at)).where(
+                OceanReading.station_id == st.id,
+                OceanReading.kind == DataKind.FORECAST,
+                OceanReading.metric == metric,
+            )
+        )
+        for metric in expected_metrics
+    }
+    if all(value is not None and value >= base for value in latest_by_metric.values()):
         stats["forecast_skipped"] += 1  # 같은 발표분은 이미 받음
         return
     nx, ny = (int(v) for v in st.external_id.split(","))
@@ -266,6 +279,10 @@ def _collect_forecast(
         for metric, unit, value in (
             (Metric.WAVE_HEIGHT, "m", r.wave_height_m),
             (Metric.WIND_SPEED, "m/s", r.wind_speed_ms),
+            (Metric.AIR_TEMP, "°C", r.air_temp_c),
+            (Metric.PRECIPITATION_PROBABILITY, "%", r.precipitation_probability_pct),
+            (Metric.SKY_STATE, "code", r.sky_code),
+            (Metric.PRECIPITATION_TYPE, "code", r.precipitation_type_code),
         ):
             db.add(
                 OceanReading(
@@ -370,6 +387,11 @@ def _handle_error(e: KhoaError, dataset: str, st: Station, day: date, stats: Cou
     else:
         log.error("%s %s %s 수집 실패: %s", dataset, st.external_id, day, e)
     stats[f"{dataset}_errors"] += 1
+    # 포털의 어플리케이션 오류는 지점별 결측이 아니라 서비스 공통 장애다. 같은
+    # 오류를 모든 지점에 반복해 호출량을 소모하지 않도록 데이터셋 단위로 차단한다.
+    if e.code in GLOBAL_ERROR_CODES and stats[f"{dataset}_errors"] >= GLOBAL_ERROR_LIMIT:
+        disabled.add(dataset)
+        log.error("%s 공통 오류 %s회 연속 발생: 이번 주기 나머지 호출 중단", dataset, GLOBAL_ERROR_LIMIT)
 
 
 def _has_errors(stats: Counter) -> bool:
@@ -398,6 +420,22 @@ def run_cycle(
         began = time.monotonic()
         try:
             stats = collect()
+        except KeyboardInterrupt:
+            failed = utcnow()
+            write_status(
+                {
+                    **base,
+                    "state": "interrupted",
+                    "attempt": attempt,
+                    "last_failure_at": failed.isoformat(),
+                    "last_finished_at": failed.isoformat(),
+                    "last_error": "사용자 중단",
+                    "stats": None,
+                    "consecutive_failures": int(previous.get("consecutive_failures", 0)) + 1,
+                    "duration_seconds": round(time.monotonic() - began, 1),
+                }
+            )
+            raise
         except Exception as exc:  # 최상위 보호막: 한 번의 예상 밖 오류로 --loop가 죽지 않게 한다
             failed = utcnow()
             state = {
@@ -407,6 +445,9 @@ def run_cycle(
                 "last_failure_at": failed.isoformat(),
                 "last_finished_at": failed.isoformat(),
                 "last_error": f"{type(exc).__name__}: {exc}",
+                # 이전 주기 통계를 이번 결과처럼 읽지 않도록 비운다
+                # (특보 수집 결과는 warning_collection 에 따로 남는다)
+                "stats": None,
                 "consecutive_failures": int(previous.get("consecutive_failures", 0)) + 1,
                 "duration_seconds": round(time.monotonic() - began, 1),
             }
@@ -434,6 +475,12 @@ def run_cycle(
             "consecutive_failures": 0 if not partial else int(previous.get("consecutive_failures", 0)) + 1,
             "duration_seconds": round(time.monotonic() - began, 1),
             "stats": dict(stats),
+            # 특보 수집 결과는 데이터셋 단위로 따로 둔다. 수집기 전체가 실패한 주기에는 갱신하지 않으므로
+            # 「수집기 전체 실패」와 「특보 데이터 수집 실패」를 구분할 수 있다 (services/warning.py)
+            "warning_collection": {
+                "ok": stats.get("warning_errors", 0) == 0,
+                "at": finished.isoformat(),
+            },
         }
         if not partial:
             state["last_success_at"] = finished.isoformat()
@@ -462,16 +509,28 @@ def main() -> None:
     if args.status:
         print_status()
         return
-    while True:
-        started = time.monotonic()
-        state, stats = run_cycle()
-        log.info("수집 주기 종료 state=%s (%.0fs): %s", state, time.monotonic() - started, dict(stats or {}))
-        if not args.loop:
-            if state == "failed":
-                raise SystemExit(1)
-            break
-        # 실패한 주기도 다음 정기 실행을 계속한다. 프로세스가 예외 한 번으로 종료되지 않는다.
-        time.sleep(LOOP_INTERVAL_SECONDS)
+    lock_path = STATUS_PATH.parent / "collector.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("w") as lock_file:
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            log.error("이미 실행 중인 수집기가 있어 종료합니다 (--loop와 launchd 중복 실행 방지)")
+            raise SystemExit(2) from None
+        lock_file.write(str(os.getpid()))
+        lock_file.flush()
+        while True:
+            started = time.monotonic()
+            state, stats = run_cycle()
+            log.info(
+                "수집 주기 종료 state=%s (%.0fs): %s", state, time.monotonic() - started, dict(stats or {})
+            )
+            if not args.loop:
+                if state == "failed":
+                    raise SystemExit(1)
+                break
+            # 실패한 주기도 다음 정기 실행을 계속한다. 프로세스가 예외 한 번으로 종료되지 않는다.
+            time.sleep(LOOP_INTERVAL_SECONDS)
 
 
 if __name__ == "__main__":

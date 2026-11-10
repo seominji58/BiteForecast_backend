@@ -40,6 +40,10 @@ class PlaceSummaryOut(BaseModel):
     wind_obs: ValueAt | None
     wind_fc_max: ValueAt | None
     temp_obs: ValueAt | None
+    air_temp_fc_min: ValueAt | None = None
+    air_temp_fc_max: ValueAt | None = None
+    pop_fc_max: ValueAt | None = None
+    precipitation_types: list[int] = []
     index: IndexSummaryOut | None
     # 원본 좌표 의심 → 자료 연결 안 함 (출조 후보·지도에서 제외)
     location_suspect: bool = False

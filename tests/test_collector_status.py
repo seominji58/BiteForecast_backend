@@ -58,3 +58,31 @@ def test_cycle_exhausts_retries_and_redacts_secret(tmp_path, monkeypatch):
     assert state == "failed" and stats is None
     assert saved["attempt"] == 3 and saved["consecutive_failures"] == 1
     assert "secret-value" not in saved["last_error"] and "serviceKey=***" in saved["last_error"]
+
+
+def test_cycle_records_warning_collection_separately(tmp_path, monkeypatch):
+    """특보 수집 결과는 데이터셋 단위로 남고, 수집기 전체 실패 주기에는 갱신되지 않는다"""
+    from app.jobs import collect, collector_status
+
+    path = tmp_path / "collector.json"
+    monkeypatch.setattr(collect, "read_status", lambda: collector_status.read_status(path))
+    monkeypatch.setattr(collect, "write_status", lambda value: collector_status.write_status(value, path))
+
+    collect.run_cycle(collect=lambda: Counter(warning_errors=1), retry_delays=(), sleep=lambda _: None)
+    saved = collector_status.read_status(path)
+    assert saved["warning_collection"]["ok"] is False
+    failed_at = saved["warning_collection"]["at"]
+
+    def boom():
+        raise RuntimeError("tide stage crashed")
+
+    collect.run_cycle(collect=boom, retry_delays=(), sleep=lambda _: None)
+    saved = collector_status.read_status(path)
+    assert saved["state"] == "failed"
+    # 이전 주기 통계를 이번 결과처럼 남기지 않는다
+    assert saved["stats"] is None
+    # 특보 수집 결과는 마지막으로 특보를 호출한 주기 그대로
+    assert saved["warning_collection"] == {"ok": False, "at": failed_at}
+
+    collect.run_cycle(collect=lambda: Counter(warning_snapshots=1), retry_delays=(), sleep=lambda _: None)
+    assert collector_status.read_status(path)["warning_collection"]["ok"] is True

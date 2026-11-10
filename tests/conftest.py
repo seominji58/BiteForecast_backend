@@ -16,6 +16,16 @@ from app.main import app  # noqa: E402
 from app.models import Place, Region  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def collector_file(tmp_path, monkeypatch):
+    """실제 runtime/collector-status.json 대신 테스트마다 빈 상태 파일을 읽는다"""
+    from app.jobs import collector_status
+
+    path = tmp_path / "collector-status.json"
+    monkeypatch.setattr(collector_status, "STATUS_PATH", path)
+    return path
+
+
 @pytest.fixture(scope="session")
 def client():
     with TestClient(app) as c:

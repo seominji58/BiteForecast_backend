@@ -14,11 +14,12 @@
 """
 
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.jobs import collector_status
 from app.models import MarineWarningSnapshot, Place
 from app.models.base import utcnow
 from app.models.enums import PlaceType
@@ -82,6 +83,40 @@ def _matches(area: str, seas: list[str], sido: str) -> bool:
     return any(s in area for s in seas) or sido in area or SIDO_FULL.get(sido, "@") in area
 
 
+def collection_health(snap_fetched_at: datetime | None) -> tuple[bool, bool]:
+    """(특보 데이터 수집 실패, 수집기 전체 실패)를 수집기 상태 파일에서 읽는다.
+
+    - 특보 수집 실패: 특보 API 를 호출했지만 실패함 (warning_collection.ok=False).
+      그 뒤에 받은 특보 스냅샷이 있으면 실패로 보지 않는다.
+    - 수집기 전체 실패: 주기 자체가 예외로 끝나거나 중단돼 특보 수집까지 가지 못했을 수 있음.
+      특보 API 가 실패했다는 뜻은 아니다.
+    """
+    s = collector_status.read_status(collector_status.STATUS_PATH)
+    w = s.get("warning_collection")
+    if isinstance(w, dict) and "ok" in w:
+        failed_at = _parse_time(w.get("at"))
+        warning_failed = w["ok"] is False and not (
+            snap_fetched_at and failed_at and _aware(snap_fetched_at) >= failed_at
+        )
+    else:
+        # 이전 형식: 정상 종료한 주기의 통계만 본다 (실패 주기에 남은 옛 통계는 믿지 않는다)
+        stats = s.get("stats") if s.get("state") in ("success", "partial") else None
+        warning_failed = int((stats or {}).get("warning_errors", 0)) > 0
+    collector_failed = s.get("state") in ("failed", "interrupted")
+    return warning_failed, collector_failed
+
+
+def _parse_time(v) -> datetime | None:
+    try:
+        return _aware(datetime.fromisoformat(v)) if isinstance(v, str) else None
+    except ValueError:
+        return None
+
+
+def _aware(t: datetime) -> datetime:
+    return t if t.tzinfo else t.replace(tzinfo=UTC)
+
+
 def evaluate(db: Session, place: Place) -> WarningOut:
     snap = db.scalar(select(MarineWarningSnapshot).order_by(MarineWarningSnapshot.fetched_at.desc()).limit(1))
     seas, sido = sea_keywords(place)
@@ -91,10 +126,27 @@ def evaluate(db: Session, place: Place) -> WarningOut:
         "fetched_at": snap.fetched_at if snap else None,
     }
 
-    if snap is None or utcnow() - snap.fetched_at > STALE_AFTER:
-        return WarningOut(level="unknown", reason="NO_DATA", **base)
+    stale = snap is not None and utcnow() - snap.fetched_at > STALE_AFTER
+    warning_failed, collector_failed = collection_health(snap.fetched_at if snap else None)
+    # 자료 만료와 수집 실패는 동시에 성립할 수 있어 원인 목록으로 함께 내려준다
+    issues = (
+        (["stale"] if stale else [])
+        + (["collection_failed"] if warning_failed else [])
+        + (["collector_failed"] if collector_failed else [])
+    )
+    base["issues"] = issues
+
+    # 적용 해역을 모름 ≠ 특보 없음 ≠ 다른 해역에만 특보 있음(no_match)
     if not seas or sido is None:
-        return WarningOut(level="unknown", reason="UNKNOWN_SEA", **base)
+        return WarningOut(level="unknown", status="unknown_sea", reason="UNKNOWN_SEA", **base)
+    if snap is None or stale:
+        if warning_failed:
+            status = "collection_failed"
+        elif collector_failed:
+            status = "collector_failed"
+        else:
+            status = "never_collected" if snap is None else "stale"
+        return WarningOut(level="unknown", status=status, reason="NO_DATA", **base)
 
     active = json.loads(snap.active_json)
     prelim = json.loads(snap.preliminary_json)
@@ -130,4 +182,12 @@ def evaluate(db: Session, place: Place) -> WarningOut:
     if level == "none" and prelim_matched:
         level = "preliminary"
 
-    return WarningOut(level=level, active=matched, preliminary=prelim_matched, **base)
+    if level == "warning":
+        status = "active"
+    elif level in ("nearby", "preliminary"):
+        status = "nearby"
+    elif active or prelim:
+        status = "no_match"
+    else:
+        status = "no_active_warnings"
+    return WarningOut(status=status, level=level, active=matched, preliminary=prelim_matched, **base)

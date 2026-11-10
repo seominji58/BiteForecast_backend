@@ -163,6 +163,10 @@ class StopOutlookOut(BaseModel):
     forecast_status: ForecastStatus
     wave_fc_max: ValueAt | None = None
     wind_fc_max: ValueAt | None = None
+    air_temp_fc_min: ValueAt | None = None
+    air_temp_fc_max: ValueAt | None = None
+    pop_fc_max: ValueAt | None = None
+    precipitation_types: list[int] = []
     # 특보는 「지금」 발효 상태. 오늘이 아닌 날짜면 warning_is_current=False → 앱은 「그날 특보 발표 전」
     warning_level: Literal["warning", "nearby", "preliminary", "none", "unknown"] | None = None
     warning_types: list[str] = []
