@@ -47,7 +47,7 @@ class PlaceCoordCheck(Base):
     grade: Mapped[str] = mapped_column(String(1))
     sub_grade: Mapped[str | None] = mapped_column(String(4))
     location_type: Mapped[str] = mapped_column(String(20), default="unknown")
-    status: Mapped[str] = mapped_column(String(16), default="unverified")
+    status: Mapped[str] = mapped_column(String(32), default="unverified")
     method: Mapped[str] = mapped_column(String(10))
     # 근거 자료 (보고서 경로·URL·문의 회신 번호 등)
     source_ref: Mapped[str | None] = mapped_column(String(300))
