@@ -18,7 +18,7 @@ from app.models import Place, PlaceStation
 from app.models.base import utcnow
 from app.schemas.compare import SeriesOut
 from app.schemas.summary import IndexSummaryOut, PlaceSummaryOut, TideEventOut, ValueAt
-from app.services.compare import _place_compare
+from app.services.compare import Prefetch, _place_compare, prefetch
 
 KST = ZoneInfo("Asia/Seoul")
 _TTL_SECONDS = 600
@@ -98,10 +98,10 @@ def _sea_group(seas: list[str]) -> str | None:
     return None
 
 
-def summarize_place(db: Session, place: Place, day: date) -> PlaceSummaryOut:
+def summarize_place(db: Session, place: Place, day: date, pf: Prefetch | None = None) -> PlaceSummaryOut:
     """한 낚시터의 하루 요약 (전체 요약·출조계획 해황이 같이 쓴다)"""
     after = utcnow() if day == today_kst() else None
-    pc = _place_compare(db, place, day)
+    pc = _place_compare(db, place, day, pf)
     wave_obs = _find(pc.series, "wave_height", "observed")
     wind_obs = _find(pc.series, "wind_speed", "observed")
     tide = next((x for x in pc.series if x.metric == "tide_extreme" and x.status == "ok"), None)
@@ -156,6 +156,7 @@ def summarize(db: Session, day: date) -> list[PlaceSummaryOut]:
             selectinload(Place.stations).selectinload(PlaceStation.station),
         )
     ).all()
-    out = [summarize_place(db, place, day) for place in places]
+    pf = prefetch(db, list(places), day)  # 전체 장소의 하루 자료를 표마다 한 번씩만 읽는다
+    out = [summarize_place(db, place, day, pf) for place in places]
     _cache[day] = (time.monotonic(), out)
     return out

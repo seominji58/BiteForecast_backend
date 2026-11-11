@@ -117,8 +117,17 @@ def _aware(t: datetime) -> datetime:
     return t if t.tzinfo else t.replace(tzinfo=UTC)
 
 
-def evaluate(db: Session, place: Place) -> WarningOut:
-    snap = db.scalar(select(MarineWarningSnapshot).order_by(MarineWarningSnapshot.fetched_at.desc()).limit(1))
+def latest_snapshot(db: Session) -> MarineWarningSnapshot | None:
+    return db.scalar(select(MarineWarningSnapshot).order_by(MarineWarningSnapshot.fetched_at.desc()).limit(1))
+
+
+_UNSET = object()
+
+
+def evaluate(db: Session, place: Place, snap=_UNSET, health: tuple[bool, bool] | None = None) -> WarningOut:
+    """snap·health 를 주면 다시 읽지 않는다 (여러 장소를 한 번에 판정할 때)"""
+    if snap is _UNSET:
+        snap = latest_snapshot(db)
     seas, sido = sea_keywords(place)
     base = {
         "seas": seas,
@@ -127,7 +136,9 @@ def evaluate(db: Session, place: Place) -> WarningOut:
     }
 
     stale = snap is not None and utcnow() - snap.fetched_at > STALE_AFTER
-    warning_failed, collector_failed = collection_health(snap.fetched_at if snap else None)
+    if health is None:
+        health = collection_health(snap.fetched_at if snap else None)
+    warning_failed, collector_failed = health
     # 자료 만료와 수집 실패는 동시에 성립할 수 있어 원인 목록으로 함께 내려준다
     issues = (
         (["stale"] if stale else [])

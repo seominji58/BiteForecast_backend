@@ -26,8 +26,19 @@ _PRIORITY = [
 ]
 
 
-def evaluate(db: Session, place_id: int, day: date) -> RegulationOut:
-    rows = db.scalars(select(Restriction).where(Restriction.place_id == place_id)).all()
+def load(db: Session, place_ids: list[int]) -> dict[int, list[Restriction]]:
+    """여러 장소의 규제 자료를 한 번에"""
+    out: dict[int, list[Restriction]] = {pid: [] for pid in place_ids}
+    for r in db.scalars(
+        select(Restriction).where(Restriction.place_id.in_(place_ids)).order_by(Restriction.restriction_id)
+    ):
+        out[r.place_id].append(r)
+    return out
+
+
+def evaluate(db: Session, place_id: int, day: date, rows: list[Restriction] | None = None) -> RegulationOut:
+    if rows is None:
+        rows = load(db, [place_id])[place_id]
     active = [
         r
         for r in rows

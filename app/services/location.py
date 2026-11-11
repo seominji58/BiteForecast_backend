@@ -8,6 +8,7 @@
 """
 
 import math
+from dataclasses import dataclass
 from functools import lru_cache
 
 from sqlalchemy import func, select
@@ -139,12 +140,37 @@ def coord_states(db: Session) -> dict[int, CoordOut]:
     return _coord_cached((int(v[0]), int(v[1] or 0)))
 
 
-def place_out(db: Session, place: Place) -> PlaceOut:
+@dataclass(frozen=True)
+class LocationCtx:
+    """여러 낚시터를 한 번에 처리할 때 위치 판단을 한 번만 읽어 두는 묶음 (원격 DB 왕복 줄이기)"""
+
+    suspects: frozenset[int]
+    holds: frozenset[int]
+    coords: dict[int, CoordOut]
+    station_seas: dict[int, frozenset[str]]
+
+
+def location_ctx(db: Session) -> LocationCtx:
+    coords = coord_states(db)
+    pv = db.execute(select(func.count(Place.id), func.max(Place.id))).one()
+    sv = db.scalar(select(func.count(Station.id))) or 0
+    version = (int(pv[0]), int(pv[1] or 0))
+    graded_d = frozenset(pid for pid, c in coords.items() if c.grade == "D")
+    return LocationCtx(
+        suspects=_suspects_cached(version) | MANUAL_CHECK_IDS | graded_d,
+        holds=frozenset(pid for pid, c in coords.items() if c.recommend_hold),
+        coords=coords,
+        station_seas=_station_seas_cached((*version, int(sv))),
+    )
+
+
+def place_out(db: Session, place: Place, ctx: LocationCtx | None = None) -> PlaceOut:
     """응답용 낚시터 (위치 확인 필요 여부·좌표 품질 포함)"""
+    ctx = ctx or location_ctx(db)
     return PlaceOut.model_validate(place).model_copy(
         update={
-            "location_suspect": place.id in suspect_place_ids(db),
-            "coord": coord_states(db).get(place.id),
+            "location_suspect": place.id in ctx.suspects,
+            "coord": ctx.coords.get(place.id),
         }
     )
 
@@ -170,12 +196,9 @@ def _station_seas_cached(version: tuple[int, int, int]) -> dict[int, frozenset[s
     return seas
 
 
-def same_sea(db: Session, place: Place, station_id: int) -> bool | None:
+def same_sea(db: Session, place: Place, station_id: int, ctx: LocationCtx | None = None) -> bool | None:
     """낚시터와 관측소가 같은 바다를 보는지. 판단할 수 없으면 None"""
-    pv = db.execute(select(func.count(Place.id), func.max(Place.id))).one()
-    sv = db.scalar(select(func.count(Station.id))) or 0
-    seas = _station_seas_cached((int(pv[0]), int(pv[1] or 0), int(sv)))
-    st_sea = seas.get(station_id)
+    st_sea = (ctx or location_ctx(db)).station_seas.get(station_id)
     p_sea = set(sea_keywords(place)[0])
     if not st_sea or not p_sea:
         return None

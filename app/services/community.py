@@ -131,10 +131,11 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
         )
     }
     popular_min = get_settings().community_popular_likes
+    pics_by_post = _photos_by_post(db, posts)
     out = []
     for p in posts:
         body = " ".join(p.body.split())
-        pics = _post_photos(db, p)
+        pics = pics_by_post[p.id]
         place = places.get(p.place_id) if p.place_id else None
         j = _verified_journal(db, p)
         out.append(
@@ -178,6 +179,32 @@ def _verified_journal(db: Session, p: Post) -> Journal | None:
     if j is None or j.deleted_at is not None or j.verification_status != VerificationStatus.APPROVED:
         return None
     return j
+
+
+def _photos_by_post(db: Session, posts: list[Post]) -> dict[int, list[Photo]]:
+    """여러 글의 사진을 한 번에 (_post_photos 와 같은 규칙). 목록에서 글마다 조회하지 않게"""
+    jids = {p.journal_id for p in posts if p.journal_id is not None}
+    journals = {
+        j.id: j
+        for j in (db.scalars(select(Journal).where(Journal.id.in_(jids))) if jids else [])
+        if j.deleted_at is None and j.verification_status == VerificationStatus.APPROVED
+    }
+    post_ids = [p.id for p in posts if p.journal_id is None]
+    rows = db.scalars(
+        select(Photo)
+        .where(
+            Photo.deleted_at.is_(None),
+            Photo.journal_id.in_(list(journals)) | Photo.post_id.in_(post_ids),
+        )
+        .order_by(Photo.sort_order, Photo.id)
+    ).all() if (journals or post_ids) else []
+    out: dict[int, list[Photo]] = {}
+    for p in posts:
+        if p.journal_id is not None:
+            out[p.id] = [x for x in rows if x.journal_id == p.journal_id] if p.journal_id in journals else []
+        else:
+            out[p.id] = [x for x in rows if x.post_id == p.id]
+    return out
 
 
 def _post_photos(db: Session, p: Post) -> list[Photo]:

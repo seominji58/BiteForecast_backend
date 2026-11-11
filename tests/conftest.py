@@ -1,7 +1,8 @@
 import os
 import tempfile
 
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+# 기본은 메모리 SQLite. TEST_DATABASE_URL 을 주면 그 DB(예: 로컬 PostgreSQL 테스트 전용 DB)에서 돌린다
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
 os.environ["APP_ENV"] = "test"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
 os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="bf-media-")
@@ -28,6 +29,23 @@ def collector_file(tmp_path, monkeypatch):
 
 @pytest.fixture(scope="session")
 def client():
+    if not os.environ["DATABASE_URL"].startswith("sqlite"):
+        # 테스트 전용 DB 만 허용 — 실수로 운영 DB 를 비우지 않게
+        url = os.environ["DATABASE_URL"]
+        assert "test" in url.rsplit("/", 1)[-1], "테스트 DB 이름에 test 가 있어야 합니다"
+        assert "supabase" not in url, "Supabase(운영) DB 로는 테스트하지 않습니다"
+        from alembic.config import Config
+        from sqlalchemy import text
+
+        from alembic import command
+        from app.core.db import engine
+        from app.core.migrate import ALEMBIC_INI
+
+        # 깨끗한 상태에서 마이그레이션으로 표를 만든다 (마이그레이션 자체도 검증)
+        with engine.begin() as conn:
+            conn.execute(text("drop schema public cascade"))
+            conn.execute(text("create schema public"))
+        command.upgrade(Config(str(ALEMBIC_INI)), "head")
     with TestClient(app) as c:
         yield c
 

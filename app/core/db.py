@@ -18,6 +18,10 @@ if _is_sqlite:
     if ":memory:" in settings.database_url:
         _engine_kwargs["poolclass"] = StaticPool
 
+else:
+    # Supabase Session pooler: 연결 수가 적으므로 작은 풀, 끊긴 연결은 미리 확인
+    _engine_kwargs.update(pool_size=5, max_overflow=2, pool_pre_ping=True, pool_recycle=1800)
+
 engine = create_engine(settings.database_url, **_engine_kwargs)
 
 if _is_sqlite:
@@ -101,12 +105,31 @@ def _add_missing_columns() -> list[str]:
     return added
 
 
+def _check_migrated() -> None:
+    """PostgreSQL: 표 구조는 Alembic 으로만 바꾼다. 최신 버전이 아니면 서버를 띄우지 않는다"""
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    from app.core.migrate import ALEMBIC_INI
+
+    head = ScriptDirectory.from_config(Config(str(ALEMBIC_INI))).get_current_head()
+    with engine.connect() as conn:
+        current = MigrationContext.configure(conn).get_current_revision()
+    if current != head:
+        raise RuntimeError(f"DB 구조 버전 {current} ≠ 최신 {head}: `alembic upgrade head` 를 먼저 실행하세요")
+
+
 def init_db() -> None:
-    """개발용: 테이블 생성 + 새 컬럼 추가 + 기준 데이터 시드."""
-    Base.metadata.create_all(engine)
-    added = _add_missing_columns()
-    if added:
-        logging.getLogger(__name__).info("컬럼 추가: %s", ", ".join(added))
+    """SQLite(개발·테스트): 테이블 생성 + 새 컬럼 추가. PostgreSQL: Alembic 버전 확인만.
+    공통: 기준 데이터(칭호·어종)가 비어 있을 때만 시드."""
+    if _is_sqlite:
+        Base.metadata.create_all(engine)
+        added = _add_missing_columns()
+        if added:
+            logging.getLogger(__name__).info("컬럼 추가: %s", ", ".join(added))
+    else:
+        _check_migrated()
     with SessionLocal() as db:
         if db.scalar(select(Title.id).limit(1)) is None:
             db.add_all(

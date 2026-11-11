@@ -4,10 +4,10 @@
 """
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import AppUser, Journal, Place, Post, Species
+from app.models import AppUser, Journal, Place, PointLedger, Post, Species
 from app.models.base import utcnow
 from app.models.enums import PhotoPurpose
 from app.schemas.journal import EnvSnapshotOut, JournalIn, JournalMutationOut, JournalOut, VerificationOut
@@ -35,11 +35,31 @@ def species_name(db: Session, code: str | None, etc: str | None) -> str | None:
     return etc
 
 
-def to_out(db: Session, j: Journal) -> JournalOut:
-    missing = verification.missing_conditions(j)
-    shared = db.scalar(
-        select(Post.id).where(Post.journal_id == j.id, Post.deleted_at.is_(None)).order_by(Post.id.desc())
+def _shared_and_points(db: Session, ids: list[int]) -> tuple[dict[int, int], dict[int, int]]:
+    """기록별 공유 게시글(가장 최근)·포인트 합계를 한 번에 (목록에서 기록마다 조회하지 않게)"""
+    if not ids:
+        return {}, {}
+    shared = dict(
+        db.execute(
+            select(Post.journal_id, func.max(Post.id))
+            .where(Post.journal_id.in_(ids), Post.deleted_at.is_(None))
+            .group_by(Post.journal_id)
+        ).all()
     )
+    points = dict(
+        db.execute(
+            select(PointLedger.journal_id, func.coalesce(func.sum(PointLedger.delta), 0))
+            .where(PointLedger.journal_id.in_(ids))
+            .group_by(PointLedger.journal_id)
+        ).all()
+    )
+    return shared, points
+
+
+def to_out(db: Session, j: Journal, batch: tuple[dict[int, int], dict[int, int]] | None = None) -> JournalOut:
+    missing = verification.missing_conditions(j)
+    shared_map, points_map = batch or _shared_and_points(db, [j.id])
+    shared = shared_map.get(j.id)
     return JournalOut(
         id=j.id,
         place_id=j.place_id,
@@ -60,7 +80,7 @@ def to_out(db: Session, j: Journal) -> JournalOut:
             requested_at=j.verification_requested_at,
             reviewed_at=j.verification_reviewed_at,
             reject_reason=j.verification_reject_reason,
-            points=verification.journal_points(db, j),
+            points=int(points_map.get(j.id, 0) or 0),
             can_request=not missing and j.verification_status in ("none", "rejected"),
             missing=missing,
         ),
@@ -79,7 +99,8 @@ def list_journals(db: Session, user: AppUser) -> list[JournalOut]:
         .order_by(Journal.fished_at.desc(), Journal.id.desc())
         .options(*_load_options())
     ).all()
-    return [to_out(db, j) for j in rows]
+    batch = _shared_and_points(db, [j.id for j in rows])
+    return [to_out(db, j, batch) for j in rows]
 
 
 def get_owned(db: Session, user: AppUser, journal_id: int) -> Journal:

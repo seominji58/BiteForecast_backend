@@ -4,6 +4,7 @@
 
   python -m scripts.supabase_copy copy     # 표 만들기 + 복사 (대상에 표·행이 있으면 거부)
   python -m scripts.supabase_copy verify   # 행 수·표본·좌표·검증 이력 대조
+  python -m scripts.supabase_copy backup   # Supabase → backups/supabase-<시각>.db (SQLite 파일)
   python -m scripts.supabase_copy lockdown # 공개 역할(anon·authenticated) 권한 회수 + RLS
   python -m scripts.supabase_copy drop --yes  # 이 스크립트가 만든 표만 삭제 (되돌리기)
 
@@ -57,7 +58,9 @@ SERIAL_SEQ = text("select pg_get_serial_sequence(:t, :c)")
 def lockdown(conn) -> None:
     """Supabase 공개 역할(anon·authenticated)이 이 표들에 접근하지 못하게 한다.
     백엔드는 postgres(소유자)로 접속하므로 영향이 없다. RLS 는 정책 없이 켜서 공개 역할은 모두 거부"""
-    names = [t.name for t in TABLES]
+    names = conn.execute(
+        text("select tablename from pg_tables where schemaname='public'")
+    ).scalars().all()
     for n in names:
         conn.execute(text(f'revoke all on table public."{n}" from anon, authenticated'))
         conn.execute(text(f'alter table public."{n}" enable row level security'))
@@ -68,38 +71,64 @@ def lockdown(conn) -> None:
         conn.execute(text(q))
 
 
-def copy() -> None:
-    src, dst = _engines()
-    existing = set(inspect(dst).get_table_names(schema="public"))
-    clash = existing & {t.name for t in TABLES}
-    if clash:
-        sys.exit(f"대상에 이미 표가 있어 복사하지 않습니다: {sorted(clash)[:5]}… (되돌리기: drop --yes)")
-    with dst.begin() as conn:  # 표 생성 + 복사를 한 트랜잭션으로 — 실패하면 아무것도 남지 않는다
-        Base.metadata.create_all(conn)
-        lockdown(conn)
-        for t in TABLES:
-            n = 0
-            with src.connect() as s:
-                rows = s.execute(select(t)).mappings()
-                batch = []
-                for r in rows:
-                    batch.append(dict(r))
-                    if len(batch) >= BATCH:
-                        conn.execute(t.insert(), batch)
-                        n += len(batch)
-                        batch = []
-                if batch:
+def _copy_rows(src, conn, *, pg_target: bool) -> None:
+    """외래키 순서대로 모든 행을 복사. PostgreSQL 대상이면 다음 ID 번호를 원본 최댓값 뒤로 맞춘다"""
+    for t in TABLES:
+        n = 0
+        with src.connect() as s:
+            batch = []
+            for r in s.execute(select(t)).mappings():
+                batch.append(dict(r))
+                if len(batch) >= BATCH:
                     conn.execute(t.insert(), batch)
                     n += len(batch)
-            # 다음 ID 번호를 원본 최댓값 뒤로
+                    batch = []
+            if batch:
+                conn.execute(t.insert(), batch)
+                n += len(batch)
+        if pg_target:
             for c in t.primary_key.columns:
                 if c.autoincrement is True or (c.autoincrement == "auto" and c.type.python_type is int):
                     seq = conn.scalar(SERIAL_SEQ, {"t": t.name, "c": c.name})
                     if seq:
                         nxt = f"coalesce((select max({c.name}) from {t.name}), 0) + 1"
                         conn.execute(text(f"select setval('{seq}', {nxt}, false)"))
-            print(f"{t.name}: {n}")
+        print(f"{t.name}: {n}")
+
+
+def copy() -> None:
+    from alembic.config import Config
+
+    from alembic import command
+    from app.core.migrate import ALEMBIC_INI
+
+    src, dst = _engines()
+    existing = set(inspect(dst).get_table_names(schema="public"))
+    clash = existing & ({t.name for t in TABLES} | {"alembic_version"})
+    if clash:
+        sys.exit(f"대상에 이미 표가 있어 복사하지 않습니다: {sorted(clash)[:5]}… (되돌리기: drop --yes)")
+    with dst.begin() as conn:  # 표 생성 + 복사를 한 트랜잭션으로 — 실패하면 아무것도 남지 않는다
+        # 표 구조는 Alembic 마이그레이션으로 (alembic_version 도 함께 기록됨)
+        cfg = Config(str(ALEMBIC_INI))
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "head")
+        lockdown(conn)
+        _copy_rows(src, conn, pg_target=True)
     print("복사 완료")
+
+
+def backup() -> None:
+    """Supabase → 로컬 SQLite 파일 (backups/supabase-<시각>.db).
+    로컬 pg_dump(14)가 Supabase(17)를 못 받아서 대신 쓴다"""
+    from datetime import datetime
+
+    _, pg = _engines()
+    out = ROOT / "backups" / f"supabase-{datetime.now():%Y%m%d-%H%M%S}.db"
+    lite = create_engine(f"sqlite:///{out}")
+    Base.metadata.create_all(lite)
+    with lite.begin() as conn:
+        _copy_rows(pg, conn, pg_target=False)
+    print(f"백업 완료: backups/{out.name}")
 
 
 def _norm(v):
@@ -166,12 +195,13 @@ def drop(yes: bool) -> None:
     with dst.begin() as conn:
         present = set(inspect(conn).get_table_names(schema="public")) & names
         Base.metadata.drop_all(conn, tables=[t for t in TABLES if t.name in present])
-    print(f"삭제한 표 {len(present)}개")
+        conn.execute(text("drop table if exists public.alembic_version"))
+    print(f"삭제한 표 {len(present)}개 (+ alembic_version)")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["copy", "verify", "lockdown", "drop"])
+    ap.add_argument("cmd", choices=["copy", "verify", "lockdown", "backup", "drop"])
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
     try:
@@ -180,7 +210,7 @@ def main() -> None:
                 lockdown(conn)
             print("공개 역할 권한 회수·RLS 켬")
             return
-        {"copy": copy, "verify": verify}.get(args.cmd, lambda: drop(args.yes))()
+        {"copy": copy, "verify": verify, "backup": backup}.get(args.cmd, lambda: drop(args.yes))()
     except SystemExit:
         raise
     except Exception as e:  # 주소·비밀번호가 메시지에 섞이지 않게

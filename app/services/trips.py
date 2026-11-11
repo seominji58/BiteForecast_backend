@@ -37,7 +37,7 @@ from app.schemas.trip import (
 from app.services import compare as compare_svc
 from app.services.compare import reference_warning
 from app.services.freshness import data_status
-from app.services.location import coord_states, review_hold_ids, suspect_place_ids
+from app.services.location import location_ctx
 from app.services.summary import summarize_place
 
 DEFAULT_CHECKLIST = ["낚싯대·릴·채비", "미끼·보냉 장비", "구명조끼", "출발 전 기상특보 재확인"]
@@ -98,7 +98,7 @@ def _stop_out(
 
 
 def to_out(db: Session, t: TripPlan) -> TripOut:
-    suspects = suspect_place_ids(db)
+    loc = location_ctx(db)  # 위치 판단은 한 번만 읽는다 (장소마다 다시 읽지 않음)
     journals = _journal_ids(db, [s.id for s in t.stops])
     species = db.get(Species, t.species_code) if t.species_code else None
     return TripOut(
@@ -111,7 +111,7 @@ def to_out(db: Session, t: TripPlan) -> TripOut:
         species_name=species.name_ko if species else None,
         species_etc=t.species_etc,
         memo=t.memo,
-        stops=[_stop_out(s, suspects, journals, coord_states(db)) for s in t.stops],
+        stops=[_stop_out(s, loc.suspects, journals, loc.coords) for s in t.stops],
         checklist=[ChecklistItemOut.model_validate(c) for c in t.checklist],
         created_at=t.created_at,
         updated_at=t.updated_at,
@@ -137,7 +137,7 @@ def list_trips(db: Session, user: AppUser, when: str) -> list[TripListItemOut]:
     else:
         stmt = stmt.where(TripPlan.end_date >= today).order_by(TripPlan.start_date, TripPlan.id)
     plans = db.scalars(stmt).all()
-    suspects = suspect_place_ids(db)
+    loc = location_ctx(db)
     journals = _journal_ids(db, [s.id for t in plans for s in t.stops])
     return [
         TripListItemOut(
@@ -150,7 +150,7 @@ def list_trips(db: Session, user: AppUser, when: str) -> list[TripListItemOut]:
             checklist_done=sum(c.checked for c in t.checklist),
             checklist_total=len(t.checklist),
             journal_count=sum(len(journals.get(s.id, [])) for s in t.stops),
-            first_stop=_stop_out(t.stops[0], suspects, journals, coord_states(db)) if t.stops else None,
+            first_stop=_stop_out(t.stops[0], loc.suspects, journals, loc.coords) if t.stops else None,
         )
         for t in plans
     ]
@@ -362,8 +362,8 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
     ds = data_status(db)
     last = forecast_last_day(ds.forecast_valid_until)
     rng = compare_svc.date_range()
-    suspects = suspect_place_ids(db)
-    holds = review_hold_ids(db)
+    loc = location_ctx(db)
+    suspects, holds = loc.suspects, loc.holds
     out: list[StopOutlookOut] = []
     for s in t.stops:
         base = {"stop_id": s.id, "day": s.day, "place_id": s.place_id}

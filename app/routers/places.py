@@ -6,7 +6,7 @@ from app.api.deps import DbSession
 from app.models import Place, PlaceInfo, PlaceStation, Region, Species
 from app.schemas.journal import SpeciesOut
 from app.schemas.place import PlaceDetailOut, PlaceInfoOut, PlaceOut, PlaceStationOut, RegionOut
-from app.services.location import place_out
+from app.services.location import location_ctx, place_out
 
 router = APIRouter(tags=["places"])
 
@@ -42,7 +42,8 @@ def list_places(db: DbSession, q: str | None = None, region_id: int | None = Non
             or_(Place.name.contains(term), Region.name.contains(term), PlaceInfo.address.contains(term))
         )
     rows = db.scalars(stmt.order_by(Region.name, Place.name)).all()
-    return [place_out(db, p) for p in rows]
+    ctx = location_ctx(db)  # 위치 판단은 한 번만 읽는다
+    return [place_out(db, p, ctx) for p in rows]
 
 
 @router.get("/places/{place_id}", response_model=PlaceDetailOut)

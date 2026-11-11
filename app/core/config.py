@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,7 +8,16 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "dev"
+    # 기본은 로컬 SQLite. Supabase 등 PostgreSQL 은 postgresql://… 그대로 넣으면 psycopg 드라이버로 바꿔 쓴다
     database_url: str = "sqlite:///./biteforecast.db"
+
+    @field_validator("database_url")
+    @classmethod
+    def _pg_driver(cls, v: str) -> str:
+        for prefix in ("postgresql://", "postgres://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
     data_go_kr_api_key: str = ""
     kma_api_key: str = ""
