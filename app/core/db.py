@@ -19,8 +19,22 @@ if _is_sqlite:
         _engine_kwargs["poolclass"] = StaticPool
 
 else:
-    # Supabase Session pooler: 연결 수가 적으므로 작은 풀, 끊긴 연결은 미리 확인
-    _engine_kwargs.update(pool_size=5, max_overflow=2, pool_pre_ping=True, pool_recycle=1800)
+    # Supabase Session pooler: 연결 수가 적으므로 작은 풀, 끊긴 연결은 미리 확인.
+    # 오래 쉰 연결은 중간 장비가 조용히 끊는다 → 5분마다 새로 맺고, TCP keepalive 로 끊김을 빨리 알아챈다
+    # (2026-11-11 쉬던 연결로 조회하다 2분 가까이 멈춘 뒤 오류)
+    _engine_kwargs.update(
+        pool_size=5,
+        max_overflow=2,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        connect_args={
+            "connect_timeout": 10,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 3,
+        },
+    )
 
 engine = create_engine(settings.database_url, **_engine_kwargs)
 
