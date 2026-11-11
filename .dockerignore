@@ -1,0 +1,20 @@
+# 비밀값·로컬 데이터는 이미지에 넣지 않는다
+.env
+.env.*
+*.db
+*.sqlite3
+backups/
+media/
+runtime/
+uploads/
+# 개발 도구
+.venv/
+.git/
+.github/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+tests/
+ops/
+.DS_Store
