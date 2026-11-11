@@ -8,8 +8,10 @@ from app.models import Place
 from app.models.base import utcnow
 from app.models.enums import DataKind
 from app.schemas.compare import CompareOut, DataSourceOut, DateRangeOut, PlaceConditionsOut, RegulationOut
+from app.schemas.fishing_index import FishingIndexDayOut
 from app.schemas.summary import DataStatusOut, PlacesSummaryOut
 from app.services import compare as svc
+from app.services.fishing_index import day_index
 from app.services.freshness import data_status
 from app.services.regulation import evaluate
 from app.services.summary import summarize
@@ -34,6 +36,13 @@ def places_summary(date: date, db: DbSession):
         disclaimer=svc.DISCLAIMER,
         data_status=data_status(db),
     )
+
+
+@router.get("/fishing-index", response_model=FishingIndexDayOut)
+def fishing_index(date: date, db: DbSession):
+    """그날 모든 공식 지수 지점의 어종별·시간대별 등급과 연결 낚시터 (홈 어종 탐색). 발표값 그대로"""
+    svc._check_day(date)
+    return day_index(db, date)
 
 
 @router.get("/meta/data-status", response_model=DataStatusOut)
