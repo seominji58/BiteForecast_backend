@@ -15,6 +15,8 @@ MAX_AHEAD_DAYS = 365
 MAX_PAST_DAYS = 30  # 막 다녀온 출조를 뒤늦게 적는 경우만 허용
 MAX_CHECKLIST = 30
 MAX_ACTIVE_PLANS = 50
+MAX_MEMBERS = 20  # 함께 가는 사람 (만든 사람 제외)
+INVITE_DAYS = 7
 
 Role = Literal["main", "alternative"]
 
@@ -54,6 +56,8 @@ class TripStopPatch(BaseModel):
 class ChecklistItemIn(BaseModel):
     label: str = Field(min_length=1, max_length=40)
     checked: bool = False
+    # 공용 준비물 담당자 (만든 사람 또는 참여자의 user_id)
+    assignee_user_id: int | None = None
 
     @field_validator("label", mode="before")
     @classmethod
@@ -117,6 +121,46 @@ class ChecklistItemOut(BaseModel):
     id: int
     label: str
     checked: bool
+    assignee_user_id: int | None = None
+    assignee_nickname: str | None = None
+
+
+class ChecklistItemPatch(BaseModel):
+    """준비물 하나: 체크 · 담당 (참여자도 가능 — 담당은 자기 자신만 맡거나 내려놓기)"""
+
+    checked: bool | None = None
+    assignee_user_id: int | None = None
+
+
+MemberStatus = Literal["joined", "maybe", "declined"]
+
+
+class TripMemberOut(BaseModel):
+    user_id: int
+    nickname: str
+    role: Literal["owner", "member"]
+    # 만든 사람은 항상 joined
+    status: MemberStatus
+    mine: bool
+
+
+class MemberStatusIn(BaseModel):
+    status: MemberStatus
+
+
+class InviteOut(BaseModel):
+    code: str
+    expires_at: datetime
+
+
+class InvitePreviewOut(BaseModel):
+    trip_id: int
+    title: str
+    start_date: date
+    end_date: date
+    owner_nickname: str
+    member_count: int  # 만든 사람 포함, 참여·미정
+    already: bool  # 이미 만든 사람이거나 참여자
 
 
 class TripOut(BaseModel):
@@ -133,6 +177,9 @@ class TripOut(BaseModel):
     checklist: list[ChecklistItemOut]
     created_at: datetime
     updated_at: datetime
+    # 함께 가기: 내 역할 (owner 만 계획·장소를 고칠 수 있다)
+    my_role: Literal["owner", "member"] = "owner"
+    members: list[TripMemberOut] = []
 
 
 class TripListItemOut(BaseModel):
@@ -147,6 +194,8 @@ class TripListItemOut(BaseModel):
     journal_count: int
     # 첫 장소 (해황 요약은 outlook API 로)
     first_stop: TripStopOut | None
+    my_role: Literal["owner", "member"] = "owner"
+    member_count: int = 1  # 만든 사람 포함, 참여·미정
 
 
 # location_review: 좌표 불일치 의심 — 좌표 기준 해황 판단 보류(특보는 주소 기준으로 보여줌)

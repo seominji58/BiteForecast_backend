@@ -37,6 +37,8 @@ from app.models import (
     Post,
     PostLike,
     TripChecklistItem,
+    TripInvite,
+    TripMember,
     TripPlan,
     TripStop,
 )
@@ -397,7 +399,18 @@ def delete_account(db: Session, account: Account) -> None:
     )
     db.execute(delete(PostLike).where(PostLike.user_id == uid))
     db.execute(delete(Favorite).where(Favorite.user_id == uid))
-    # 출조계획은 본인만 보는 개인 자료 → 실제로 지운다 (장소·준비물은 FK CASCADE, 기록 연결은 SET NULL)
+    # 함께 가는 출조: 내가 참여한 다른 사람의 계획에서는 빠지고, 내가 맡은 준비물 담당도 내려놓는다
+    db.execute(delete(TripMember).where(TripMember.user_id == uid))
+    db.execute(
+        update(TripChecklistItem)
+        .where(TripChecklistItem.assignee_user_id == uid)
+        .values(assignee_user_id=None)
+    )
+    # 내가 만든 출조계획은 실제로 지운다 (참여자·초대 코드도 함께.
+    # 장소·준비물은 FK CASCADE, 기록 연결은 SET NULL)
+    my_plans = select(TripPlan.id).where(TripPlan.user_id == uid)
+    db.execute(delete(TripMember).where(TripMember.plan_id.in_(my_plans)))
+    db.execute(delete(TripInvite).where(TripInvite.plan_id.in_(my_plans)))
     stop_ids = (
         select(TripStop.id).join(TripPlan, TripPlan.id == TripStop.plan_id).where(TripPlan.user_id == uid)
     )

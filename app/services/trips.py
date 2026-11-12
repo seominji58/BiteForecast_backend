@@ -5,6 +5,7 @@
 - 다른 날짜의 값으로 대신하지 않는다
 """
 
+import secrets
 from collections import Counter
 from datetime import date, timedelta
 
@@ -13,20 +14,38 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.timeutil import KST, today_kst
-from app.models import AppUser, Journal, Place, PlaceStation, Species, TripChecklistItem, TripPlan, TripStop
+from app.models import (
+    AppUser,
+    Journal,
+    Place,
+    PlaceStation,
+    Species,
+    TripChecklistItem,
+    TripInvite,
+    TripMember,
+    TripPlan,
+    TripStop,
+)
 from app.models.base import utcnow
 from app.schemas.place import PlaceOut
 from app.schemas.trip import (
+    INVITE_DAYS,
     MAX_ACTIVE_PLANS,
     MAX_AHEAD_DAYS,
     MAX_DAYS,
+    MAX_MEMBERS,
     MAX_PAST_DAYS,
     MAX_STOPS_PER_DAY,
     ChecklistItemIn,
     ChecklistItemOut,
+    ChecklistItemPatch,
+    InviteOut,
+    InvitePreviewOut,
+    MemberStatus,
     StopOutlookOut,
     TripIn,
     TripListItemOut,
+    TripMemberOut,
     TripOut,
     TripOutlookOut,
     TripPatch,
@@ -35,6 +54,7 @@ from app.schemas.trip import (
     TripStopPatch,
 )
 from app.services import compare as compare_svc
+from app.services.community import nicknames
 from app.services.compare import reference_warning
 from app.services.freshness import data_status
 from app.services.location import location_ctx
@@ -50,10 +70,18 @@ def _bad(msg: str) -> HTTPException:
 # --- 조회 ---
 
 
-def _load(db: Session, user: AppUser, trip_id: int) -> TripPlan:
+ACTIVE_STATUSES = ("joined", "maybe")  # 참여·미정 = 함께 가는 사람 (불참은 목록에서 뺀다)
+
+
+def _member(db: Session, plan_id: int, user_id: int) -> TripMember | None:
+    return db.scalar(select(TripMember).where(TripMember.plan_id == plan_id, TripMember.user_id == user_id))
+
+
+def _load(db: Session, user: AppUser, trip_id: int, *, owner: bool = True) -> TripPlan:
+    """owner=True: 만든 사람만 (계획·장소 수정). owner=False: 참여자도 볼 수 있다"""
     t = db.scalar(
         select(TripPlan)
-        .where(TripPlan.id == trip_id, TripPlan.user_id == user.id, TripPlan.deleted_at.is_(None))
+        .where(TripPlan.id == trip_id, TripPlan.deleted_at.is_(None))
         .options(
             selectinload(TripPlan.stops).selectinload(TripStop.place).selectinload(Place.region),
             selectinload(TripPlan.checklist),
@@ -61,7 +89,28 @@ def _load(db: Session, user: AppUser, trip_id: int) -> TripPlan:
     )
     if t is None:
         raise HTTPException(status_code=404, detail="출조계획을 찾을 수 없습니다")
+    if t.user_id == user.id:
+        return t
+    m = _member(db, t.id, user.id)
+    if m is None:
+        # 다른 사람의 계획은 있는지도 알려주지 않는다
+        raise HTTPException(status_code=404, detail="출조계획을 찾을 수 없습니다")
+    if owner:
+        raise HTTPException(status_code=403, detail="계획을 만든 사람만 바꿀 수 있어요")
     return t
+
+
+def _participants(db: Session, t: TripPlan) -> set[int]:
+    """만든 사람 + 참여·미정 참여자"""
+    ids = {t.user_id}
+    ids.update(
+        db.scalars(
+            select(TripMember.user_id).where(
+                TripMember.plan_id == t.id, TripMember.status.in_(ACTIVE_STATUSES)
+            )
+        )
+    )
+    return ids
 
 
 def _journal_ids(db: Session, stop_ids: list[int]) -> dict[int, list[int]]:
@@ -97,10 +146,19 @@ def _stop_out(
     )
 
 
-def to_out(db: Session, t: TripPlan) -> TripOut:
+def to_out(db: Session, t: TripPlan, user: AppUser | None = None) -> TripOut:
     loc = location_ctx(db)  # 위치 판단은 한 번만 읽는다 (장소마다 다시 읽지 않음)
     journals = _journal_ids(db, [s.id for s in t.stops])
     species = db.get(Species, t.species_code) if t.species_code else None
+    rows = db.execute(
+        select(TripMember.user_id, TripMember.status)
+        .where(TripMember.plan_id == t.id)
+        .order_by(TripMember.id)
+    ).all()
+    order = {"joined": 0, "maybe": 1, "declined": 2}
+    people = [(t.user_id, "joined"), *sorted(((u, st) for u, st in rows), key=lambda x: order.get(x[1], 9))]
+    assignees = {c.assignee_user_id for c in t.checklist if c.assignee_user_id}
+    names = nicknames(db, {u for u, _ in people} | assignees)
     return TripOut(
         id=t.id,
         title=t.title,
@@ -112,21 +170,45 @@ def to_out(db: Session, t: TripPlan) -> TripOut:
         species_etc=t.species_etc,
         memo=t.memo,
         stops=[_stop_out(s, loc.suspects, journals, loc.coords) for s in t.stops],
-        checklist=[ChecklistItemOut.model_validate(c) for c in t.checklist],
+        checklist=[
+            ChecklistItemOut.model_validate(c).model_copy(
+                update={"assignee_nickname": names.get(c.assignee_user_id) if c.assignee_user_id else None}
+            )
+            for c in t.checklist
+        ],
         created_at=t.created_at,
         updated_at=t.updated_at,
+        my_role="owner" if user is None or user.id == t.user_id else "member",
+        members=[
+            TripMemberOut(
+                user_id=uid,
+                nickname=names[uid],
+                role="owner" if uid == t.user_id else "member",
+                status=status,
+                mine=user is not None and uid == user.id,
+            )
+            for uid, status in people
+        ],
     )
 
 
 def get_trip(db: Session, user: AppUser, trip_id: int) -> TripOut:
-    return to_out(db, _load(db, user, trip_id))
+    return to_out(db, _load(db, user, trip_id, owner=False), user)
 
 
 def list_trips(db: Session, user: AppUser, when: str) -> list[TripListItemOut]:
     today = today_kst()
     stmt = (
         select(TripPlan)
-        .where(TripPlan.user_id == user.id, TripPlan.deleted_at.is_(None))
+        .where(
+            (TripPlan.user_id == user.id)
+            | TripPlan.id.in_(
+                select(TripMember.plan_id).where(
+                    TripMember.user_id == user.id, TripMember.status.in_(ACTIVE_STATUSES)
+                )
+            ),
+            TripPlan.deleted_at.is_(None),
+        )
         .options(
             selectinload(TripPlan.stops).selectinload(TripStop.place).selectinload(Place.region),
             selectinload(TripPlan.checklist),
@@ -139,6 +221,13 @@ def list_trips(db: Session, user: AppUser, when: str) -> list[TripListItemOut]:
     plans = db.scalars(stmt).all()
     loc = location_ctx(db)
     journals = _journal_ids(db, [s.id for t in plans for s in t.stops])
+    counts = dict(
+        db.execute(
+            select(TripMember.plan_id, func.count())
+            .where(TripMember.plan_id.in_([t.id for t in plans]), TripMember.status.in_(ACTIVE_STATUSES))
+            .group_by(TripMember.plan_id)
+        ).all()
+    ) if plans else {}
     return [
         TripListItemOut(
             id=t.id,
@@ -151,6 +240,8 @@ def list_trips(db: Session, user: AppUser, when: str) -> list[TripListItemOut]:
             checklist_total=len(t.checklist),
             journal_count=sum(len(journals.get(s.id, [])) for s in t.stops),
             first_stop=_stop_out(t.stops[0], loc.suspects, journals, loc.coords) if t.stops else None,
+            my_role="owner" if t.user_id == user.id else "member",
+            member_count=1 + counts.get(t.id, 0),
         )
         for t in plans
     ]
@@ -325,8 +416,13 @@ def delete_stop(db: Session, user: AppUser, trip_id: int, stop_id: int) -> TripO
 
 def replace_checklist(db: Session, user: AppUser, trip_id: int, items: list[ChecklistItemIn]) -> TripOut:
     t = _load(db, user, trip_id)
+    people = _participants(db, t)
+    for c in items:
+        if c.assignee_user_id is not None and c.assignee_user_id not in people:
+            raise _bad("담당자는 함께 가는 사람 중에서 정해 주세요")
     t.checklist = [
-        TripChecklistItem(label=c.label, checked=c.checked, sort_order=i) for i, c in enumerate(items)
+        TripChecklistItem(label=c.label, checked=c.checked, sort_order=i, assignee_user_id=c.assignee_user_id)
+        for i, c in enumerate(items)
     ]
     db.commit()
     db.expire(t)
@@ -334,11 +430,20 @@ def replace_checklist(db: Session, user: AppUser, trip_id: int, items: list[Chec
 
 
 def owned_stop_for_journal(db: Session, user: AppUser, stop_id: int, place_id: int) -> None:
-    """기록에 계획 장소를 연결할 때: 본인 계획의 장소이고 같은 낚시터여야 한다"""
+    """기록에 계획 장소를 연결할 때: 내가 만들었거나 함께 가는 계획의 장소이고 같은 낚시터여야 한다"""
     s = db.scalar(
         select(TripStop)
         .join(TripPlan, TripPlan.id == TripStop.plan_id)
-        .where(TripStop.id == stop_id, TripPlan.user_id == user.id, TripPlan.deleted_at.is_(None))
+        .where(
+            TripStop.id == stop_id,
+            TripPlan.deleted_at.is_(None),
+            (TripPlan.user_id == user.id)
+            | TripPlan.id.in_(
+                select(TripMember.plan_id).where(
+                    TripMember.user_id == user.id, TripMember.status.in_(ACTIVE_STATUSES)
+                )
+            ),
+        )
     )
     if s is None:
         raise _bad("연결할 출조계획 장소를 찾을 수 없습니다")
@@ -357,7 +462,7 @@ def forecast_last_day(valid_until) -> date | None:
 
 
 def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
-    t = _load(db, user, trip_id)
+    t = _load(db, user, trip_id, owner=False)
     today = today_kst()
     ds = data_status(db)
     last = forecast_last_day(ds.forecast_valid_until)
@@ -418,3 +523,138 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
             )
         )
     return TripOutlookOut(trip_id=t.id, today=today, forecast_last_day=last, stops=out, data_status=ds)
+
+
+# --- 함께 가기 (초대·참여) ---
+
+_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # 헷갈리는 0·O·1·I 제외
+
+
+def _new_code(db: Session) -> str:
+    while True:
+        code = "".join(secrets.choice(_CODE_CHARS) for _ in range(6))
+        if db.scalar(select(TripInvite.id).where(TripInvite.code == code)) is None:
+            return code
+
+
+def _usable(i: TripInvite | None) -> bool:
+    return i is not None and i.revoked_at is None and i.expires_at > utcnow()
+
+
+def create_invite(db: Session, user: AppUser, trip_id: int) -> InviteOut:
+    """초대 코드 (만든 사람만). 쓸 수 있는 코드가 있으면 그대로 돌려준다"""
+    t = _load(db, user, trip_id)
+    current = db.scalar(
+        select(TripInvite).where(TripInvite.plan_id == t.id).order_by(TripInvite.id.desc()).limit(1)
+    )
+    if not _usable(current):
+        expires = utcnow() + timedelta(days=INVITE_DAYS)
+        current = TripInvite(plan_id=t.id, code=_new_code(db), expires_at=expires)
+        db.add(current)
+        db.commit()
+    return InviteOut(code=current.code, expires_at=current.expires_at)
+
+
+def revoke_invite(db: Session, user: AppUser, trip_id: int) -> None:
+    t = _load(db, user, trip_id)
+    now = utcnow()
+    active = select(TripInvite).where(TripInvite.plan_id == t.id, TripInvite.revoked_at.is_(None))
+    for i in db.scalars(active):
+        i.revoked_at = now
+    db.commit()
+
+
+def _invite_plan(db: Session, code: str) -> TripPlan:
+    i = db.scalar(select(TripInvite).where(TripInvite.code == code.strip().upper()))
+    t = db.get(TripPlan, i.plan_id) if _usable(i) else None
+    if t is None or t.deleted_at is not None:
+        raise HTTPException(
+            status_code=404,
+            detail="초대 코드가 없거나 만료됐어요. 계획을 만든 사람에게 새 코드를 받아 주세요",
+        )
+    return t
+
+
+def preview_invite(db: Session, user: AppUser, code: str) -> InvitePreviewOut:
+    t = _invite_plan(db, code)
+    people = _participants(db, t)
+    return InvitePreviewOut(
+        trip_id=t.id,
+        title=t.title,
+        start_date=t.start_date,
+        end_date=t.end_date,
+        owner_nickname=nicknames(db, {t.user_id})[t.user_id],
+        member_count=len(people),
+        already=user.id in people,
+    )
+
+
+def join_trip(db: Session, user: AppUser, code: str) -> TripOut:
+    t = _invite_plan(db, code)
+    if t.user_id != user.id:
+        m = _member(db, t.id, user.id)
+        if m is None:
+            if len(_participants(db, t)) - 1 >= MAX_MEMBERS:
+                raise _bad(f"함께 가는 사람은 최대 {MAX_MEMBERS}명까지예요")
+            db.add(TripMember(plan_id=t.id, user_id=user.id, status="joined"))
+        else:
+            m.status = "joined"
+        db.commit()
+    return get_trip(db, user, t.id)
+
+
+def set_my_status(db: Session, user: AppUser, trip_id: int, status: MemberStatus) -> TripOut:
+    t = _load(db, user, trip_id, owner=False)
+    m = _member(db, t.id, user.id)
+    if m is None:
+        raise _bad("계획을 만든 사람은 참여 상태를 바꿀 수 없어요")
+    m.status = status
+    if status == "declined":
+        _unassign(db, t, user.id)
+    db.commit()
+    return get_trip(db, user, t.id)
+
+
+def _unassign(db: Session, t: TripPlan, user_id: int) -> None:
+    for c in t.checklist:
+        if c.assignee_user_id == user_id:
+            c.assignee_user_id = None
+
+
+def remove_member(db: Session, user: AppUser, trip_id: int, member_user_id: int) -> None:
+    """만든 사람은 누구든 내보낼 수 있고, 참여자는 자기만 나갈 수 있다"""
+    t = _load(db, user, trip_id, owner=False)
+    if user.id != t.user_id and member_user_id != user.id:
+        raise HTTPException(status_code=403, detail="다른 참여자는 만든 사람만 내보낼 수 있어요")
+    m = _member(db, t.id, member_user_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="참여자를 찾을 수 없습니다")
+    _unassign(db, t, member_user_id)
+    db.delete(m)
+    db.commit()
+
+
+def patch_checklist_item(
+    db: Session, user: AppUser, trip_id: int, item_id: int, data: ChecklistItemPatch
+) -> TripOut:
+    """준비물 하나 체크·담당. 참여자는 자기 자신만 담당으로 정하거나 자기 담당을 내려놓을 수 있다"""
+    t = _load(db, user, trip_id, owner=False)
+    c = next((x for x in t.checklist if x.id == item_id), None)
+    if c is None:
+        raise HTTPException(status_code=404, detail="준비물을 찾을 수 없습니다")
+    values = data.model_dump(exclude_unset=True)
+    if values.get("checked") is not None:
+        c.checked = values["checked"]
+    if "assignee_user_id" in values:
+        who = values["assignee_user_id"]
+        owner = user.id == t.user_id
+        if who is not None and who not in _participants(db, t):
+            raise _bad("담당자는 함께 가는 사람 중에서 정해 주세요")
+        if not owner and who not in (None, user.id):
+            raise HTTPException(status_code=403, detail="담당은 자기 자신만 맡을 수 있어요")
+        if not owner and who is None and c.assignee_user_id not in (None, user.id):
+            raise HTTPException(status_code=403, detail="다른 사람의 담당은 만든 사람만 바꿀 수 있어요")
+        c.assignee_user_id = who
+    db.commit()
+    db.expire(t)
+    return get_trip(db, user, t.id)
