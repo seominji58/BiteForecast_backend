@@ -11,17 +11,21 @@ from app.core.config import get_settings
 
 # 공공데이터포털 URL 의 serviceKey=… 는 값이 무엇이든 가린다 (설정에 없는 예전 키 대비)
 _QUERY_KEY = re.compile(r"(serviceKey|authKey|apiKey)=([^&\s\"']+)", re.IGNORECASE)
+# 경기데이터드림 URL 의 KEY=… (대문자 파라미터)
+_GG_KEY = re.compile(r"([?&])KEY=([^&\s\"']+)")
 
 
 def _secrets() -> list[str]:
     s = get_settings()
-    return [v for v in (s.data_go_kr_api_key, s.kma_api_key, s.admin_token) if v and len(v) >= 8]
+    keys = (s.data_go_kr_api_key, s.kma_api_key, s.gyeonggi_data_api_key, s.admin_token)
+    return [v for v in keys if v and len(v) >= 8]
 
 
 def redact(text: str) -> str:
     for v in _secrets():
         text = text.replace(v, "***")
-    return _QUERY_KEY.sub(lambda m: f"{m.group(1)}=***", text)
+    text = _QUERY_KEY.sub(lambda m: f"{m.group(1)}=***", text)
+    return _GG_KEY.sub(lambda m: f"{m.group(1)}KEY=***", text)
 
 
 class RedactFilter(logging.Filter):

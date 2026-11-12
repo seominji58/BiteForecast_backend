@@ -21,6 +21,8 @@ class Settings(BaseSettings):
 
     data_go_kr_api_key: str = ""
     kma_api_key: str = ""
+    # 경기데이터드림(openapi.gg.go.kr) 인증키 — 경기도 낚시어선업 현황 등. 서버에서만 사용
+    gyeonggi_data_api_key: str = ""
 
     point_daily_cap: int = 0
     external_timeout_seconds: float = 10
