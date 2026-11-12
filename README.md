@@ -4,8 +4,8 @@
 
 - 배포 서버: https://biteforecast-api.fly.dev/api/v1
 
-- 기획 의도(개발 배경): [개발 배경 및 기획 의도](https://github.com/seominji58/BiteForecast_docs/blob/main/01_기획/2026-11-12_개발배경_및_외부API.md#1-개발-배경-및-기획-의도)
-- 외부 API 정리: [사용 중인 외부 API·서비스](https://github.com/seominji58/BiteForecast_docs/blob/main/01_기획/2026-11-12_개발배경_및_외부API.md#2-사용-중인-외부-api서비스)
+- 기획 의도(개발 배경): [개발 배경 및 기획 의도](https://github.com/seominji58/BiteForecast_docs/blob/main/01_기획/기획의도.md)
+- 외부 API 정리: [사용 중인 외부 API·서비스](https://github.com/seominji58/BiteForecast_docs/blob/main/03_데이터/외부_API.md)
 - 기능명세서: [BiteForecast_docs / 02_명세](https://github.com/seominji58/BiteForecast_docs/tree/main/02_명세)
 - 앱: [BiteForecast_frontend](https://github.com/seominji58/BiteForecast_frontend)
 
