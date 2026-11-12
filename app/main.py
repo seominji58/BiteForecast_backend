@@ -76,6 +76,7 @@ app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(places.router, prefix=API_PREFIX)
 app.include_router(me.router, prefix=API_PREFIX)
 app.include_router(trips.router, prefix=API_PREFIX)
+app.include_router(trips.invites, prefix=API_PREFIX)
 
 app.include_router(journals.router, prefix=API_PREFIX)
 app.include_router(compare.router, prefix=API_PREFIX)
