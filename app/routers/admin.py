@@ -63,7 +63,8 @@ class RejectIn(BaseModel):
 def _item(db, j: Journal) -> ReviewItem:
     return ReviewItem(
         journal_id=j.id,
-        author=nicknames(db, {j.user_id})[j.user_id],
+        # 관리자 화면은 같은 사람인지 구분할 수 있게 내부 번호를 붙인다 (공개 화면에는 내지 않음)
+        author=f"{nicknames(db, {j.user_id})[j.user_id]} (#{j.user_id})",
         place_name=j.place.name,
         fished_at=j.fished_at,
         species_name=species_name(db, j.species_code, j.species_etc),

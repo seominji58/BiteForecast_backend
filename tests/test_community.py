@@ -1,5 +1,7 @@
 """커뮤니티: 작성·목록·댓글·좋아요·신고 숨김·권한"""
 
+import uuid
+
 from tests.conftest import signup
 
 URL = "/api/v1/community"
@@ -202,3 +204,21 @@ def test_before_id_paging(client):
     assert [x["id"] for x in first] == ids[::-1][:2]
     nxt = client.get(f"{URL}/posts", params={"limit": 2, "before_id": first[-1]["id"]}).json()
     assert nxt[0]["id"] == ids[0]
+
+
+def test_legacy_author_hides_internal_id(client):
+    """계정 없는 예전 기기 사용자 글은 내부 번호 없이 「이전 사용자」로 보인다"""
+    from app.core.db import SessionLocal
+    from app.models import AppUser
+    from app.models.community import Post, PostCategory
+
+    with SessionLocal() as db:
+        u = AppUser(device_id=str(uuid.uuid4()))
+        db.add(u)
+        db.flush()
+        db.add(Post(user_id=u.id, category=PostCategory.TIP, title="예전 글", body="로그인 없이 쓴 글"))
+        db.commit()
+        uid = u.id
+    got = [x for x in client.get(f"{URL}/posts").json() if x["title"] == "예전 글"]
+    assert got and got[0]["author"]["nickname"] == "이전 사용자"
+    assert str(uid) not in got[0]["author"]["nickname"]

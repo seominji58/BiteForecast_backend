@@ -12,7 +12,7 @@ def _strip(v):
 
 
 class AuthorOut(BaseModel):
-    nickname: str  # 로그인 없음: 기기 사용자 번호 기반 「낚시인0012」
+    nickname: str  # 계정 닉네임. 계정 없는 예전 기기 사용자는 「이전 사용자」
     title: str  # 현재 칭호
 
 

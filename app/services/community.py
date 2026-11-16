@@ -1,7 +1,8 @@
 """커뮤니티 (명세 §15, v1.3).
 
 운영 원칙
-- 로그인 없이 기기 사용자로 작성. 표시명은 「낚시인{번호}」 + 현재 칭호
+- 작성은 로그인 필요 (2026-11-09). 표시명은 계정 닉네임 + 현재 칭호.
+  로그인 없이 쓰던 예전 기기 사용자 글은 「이전 사용자」 (내부 번호를 드러내지 않음)
 - 신고 3회(설정값) 누적 시 자동 숨김. 작성자 본인은 자기 글을 계속 볼 수 있다
 - 삭제는 소프트 삭제 (작성자 본인만)
 - 위치는 사용자가 고른 지원 장소 또는 지역만 연결 (GPS 사용 안 함, NFR-01)
@@ -58,13 +59,16 @@ EXCERPT_LEN = 80
 POPULAR_WINDOW = timedelta(days=30)
 
 
+LEGACY_NICKNAME = "이전 사용자"
+
+
 def nickname(user_id: int) -> str:
-    """로그인 없이 쓰던 사용자 표시명"""
-    return f"낚시인{user_id:04d}"
+    """로그인 없이 쓰던 예전 기기 사용자 표시명. 내부 사용자 번호는 공개 화면에 내지 않는다"""
+    return LEGACY_NICKNAME
 
 
 def nicknames(db: Session, user_ids: set[int]) -> dict[int, str]:
-    """작성자 표시명: 계정 닉네임, 계정이 없으면 「낚시인0012」"""
+    """작성자 표시명: 계정 닉네임, 계정이 없으면 「이전 사용자」"""
     names = dict(
         db.execute(select(Account.user_id, Account.nickname).where(Account.user_id.in_(user_ids))).all()
     )
