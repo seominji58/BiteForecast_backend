@@ -3,6 +3,8 @@ import tempfile
 
 # 기본은 메모리 SQLite. TEST_DATABASE_URL 을 주면 그 DB(예: 로컬 PostgreSQL 테스트 전용 DB)에서 돌린다
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite:///:memory:")
+# 개발자 .env 에 있는 로그인 설정이 테스트 결과를 바꾸지 않게 고정 (환경변수가 .env 보다 우선)
+os.environ["GOOGLE_CLIENT_IDS"] = ""
 os.environ["APP_ENV"] = "test"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
 os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="bf-media-")
