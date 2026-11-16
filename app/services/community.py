@@ -38,10 +38,12 @@ from app.schemas.community import (
     BlockIn,
     BlockOut,
     CatchOut,
+    CatchSummaryOut,
     CommentIn,
     CommentOut,
     LikeOut,
     PostDetailOut,
+    PostEdit,
     PostIn,
     PostSummaryOut,
     ReportIn,
@@ -393,6 +395,96 @@ def create_post(db: Session, user: AppUser, data: PostIn) -> PostDetailOut:
         photos.attach(db, user, data.photo_ids, PhotoPurpose.POST, post=p)
     db.commit()
     return get_post(db, user, p.id)
+
+
+def update_post(db: Session, user: AppUser, post_id: int, data: PostEdit) -> PostDetailOut:
+    """내 글 고치기 (보낸 칸만). 위치 공개 범위는 언제든 좁히거나 넓힐 수 있다"""
+    p = _get_post(db, user, post_id)
+    if p.user_id != user.id:
+        raise HTTPException(status_code=403, detail="내가 쓴 글만 고칠 수 있습니다")
+    sent = data.model_fields_set
+    if p.journal_id is not None and sent & {"category", "place_id", "region_id", "species_code", "species_etc"}:
+        raise HTTPException(status_code=400, detail="기록을 공유한 글은 분류·장소·어종을 바꿀 수 없어요. 기록에서 고쳐 주세요")
+    if data.title is not None:
+        p.title = data.title
+    if data.body is not None:
+        p.body = data.body
+    if data.category is not None:
+        p.category = data.category
+    if data.show_tackle is not None:
+        p.show_tackle = data.show_tackle
+    if {"species_code", "species_etc"} & sent:
+        code, etc = (data.species_code or None), (data.species_etc or "").strip() or None
+        if code and etc:
+            raise HTTPException(status_code=400, detail="어종은 하나만 고를 수 있습니다")
+        if code and db.get(Species, code) is None:
+            raise HTTPException(status_code=400, detail="알 수 없는 어종 코드입니다")
+        p.species_code, p.species_etc = code, etc
+    if "place_id" in sent:
+        if data.place_id is not None:
+            place = db.get(Place, data.place_id)
+            if place is None or not place.is_active:
+                raise HTTPException(status_code=400, detail="지원하지 않는 장소입니다")
+            p.region_id = None
+        p.place_id = data.place_id
+    if "region_id" in sent and p.place_id is None:
+        if data.region_id is not None:
+            region = db.get(Region, data.region_id)
+            if region is None or not region.is_active:
+                raise HTTPException(status_code=400, detail="지원하지 않는 지역입니다")
+        p.region_id = data.region_id
+    if data.location_visibility is not None:
+        p.location_visibility = data.location_visibility
+    if p.location_visibility == LocationVisibility.PLACE and p.place_id is None:
+        raise HTTPException(status_code=400, detail="낚시터 이름을 공개하려면 낚시터를 골라 주세요")
+    p.updated_at = utcnow()
+    db.commit()
+    return get_post(db, user, p.id)
+
+
+CATCH_SUMMARY_MAX_DAYS = 60
+
+
+def catch_summary(db: Session, user: AppUser, days: int) -> list[CatchSummaryOut]:
+    """낚시터별 최근 이용자 조황 (지도 핀·어종 칩·낚시터 카드용).
+    낚시터 이름까지 공개한 조황 글만 센다 — 「지역만」「숨김」 글은 낚시터에 묶지 않는다. 예보·추천이 아니다"""
+    days = min(max(days, 1), CATCH_SUMMARY_MAX_DAYS)
+    posts = db.scalars(
+        _visible_posts(user).where(
+            Post.category == PostCategory.CATCH,
+            Post.location_visibility == LocationVisibility.PLACE,
+            Post.place_id.is_not(None),
+            Post.created_at >= utcnow() - timedelta(days=days),
+        )
+    ).all()
+    journals = {
+        j.id: j
+        for j in db.scalars(select(Journal).where(Journal.id.in_([p.journal_id for p in posts if p.journal_id]))).all()
+    }
+    by_place: dict[int, list[Post]] = {}
+    for p in posts:
+        by_place.setdefault(p.place_id, []).append(p)
+    out = []
+    for place_id, ps in by_place.items():
+        names: dict[str, int] = {}
+        best: float | None = None
+        for p in ps:
+            n = species_name(db, p.species_code, p.species_etc)
+            if n:
+                names[n] = names.get(n, 0) + 1
+            j = journals.get(p.journal_id) if p.journal_id else None
+            if j is not None and j.max_length_cm is not None and _journal_shown(j):
+                best = max(best or 0, float(j.max_length_cm))
+        out.append(
+            CatchSummaryOut(
+                place_id=place_id,
+                posts=len(ps),
+                species=[n for n, _ in sorted(names.items(), key=lambda x: -x[1])][:3],
+                best_cm=best,
+                last_at=max(p.created_at for p in ps),
+            )
+        )
+    return sorted(out, key=lambda x: x.last_at, reverse=True)
 
 
 def delete_post(db: Session, user: AppUser, post_id: int) -> None:

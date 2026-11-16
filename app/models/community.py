@@ -13,6 +13,7 @@ class PostCategory(StrEnum):
     CATCH = "catch"  # 조황공유
     QUESTION = "question"  # 낚시질문
     TIP = "tip"  # 정보·팁
+    FREE = "free"  # 자유게시판 (낚시 말고도 아무 이야기). DB 는 문자열 칸이라 마이그레이션 없음
 
 
 class LocationVisibility(StrEnum):

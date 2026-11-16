@@ -136,3 +136,29 @@ class BlockOut(BaseModel):
     user_id: int
     nickname: str
     created_at: datetime
+
+
+class PostEdit(BaseModel):
+    """내 글 고치기. 보낸 칸만 바꾼다. 기록을 공유한 글은 분류·장소·어종을 바꿀 수 없다(기록 것을 씀)"""
+
+    category: PostCategory | None = None
+    title: str | None = Field(default=None, min_length=2, max_length=60)
+    body: str | None = Field(default=None, min_length=1, max_length=2000)
+    place_id: int | None = None
+    region_id: int | None = None
+    location_visibility: LocationVisibility | None = None
+    species_code: str | None = Field(default=None, max_length=30)
+    species_etc: str | None = Field(default=None, max_length=50)
+    show_tackle: bool | None = None
+
+    _s = field_validator("title", "body", mode="before")(_strip)
+
+
+class CatchSummaryOut(BaseModel):
+    """낚시터별 최근 이용자 조황 요약 — 낚시터 이름까지 공개한 조황 글만 센다 (예보 아님)"""
+
+    place_id: int
+    posts: int
+    species: list[str]  # 많이 올라온 순, 최대 3
+    best_cm: float | None  # 공유 기록의 최대 길이 중 가장 큰 값
+    last_at: datetime

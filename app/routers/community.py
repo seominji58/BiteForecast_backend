@@ -7,9 +7,11 @@ from app.models.community import PostCategory
 from app.schemas.community import (
     BlockIn,
     BlockOut,
+    CatchSummaryOut,
     CommentIn,
     LikeOut,
     PostDetailOut,
+    PostEdit,
     PostIn,
     PostSummaryOut,
     ReportIn,
@@ -48,6 +50,17 @@ def create_post(data: PostIn, user: CurrentUser, db: DbSession):
 @router.get("/posts/{post_id}", response_model=PostDetailOut)
 def get_post(post_id: int, user: Reader, db: DbSession):
     return svc.get_post(db, user, post_id)
+
+
+@router.patch("/posts/{post_id}", response_model=PostDetailOut)
+def update_post(post_id: int, data: PostEdit, user: CurrentUser, db: DbSession):
+    return svc.update_post(db, user, post_id, data)
+
+
+@router.get("/catch-summary", response_model=list[CatchSummaryOut])
+def catch_summary(user: Reader, db: DbSession, days: int = 14):
+    """낚시터별 최근 이용자 조황 요약 (낚시터 이름까지 공개한 조황 글만)"""
+    return svc.catch_summary(db, user, days)
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
