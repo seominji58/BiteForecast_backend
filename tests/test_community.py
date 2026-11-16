@@ -19,7 +19,7 @@ def post(client, h, **kw):
 
 def test_create_list_and_detail(client, places):
     h = signup(client)
-    p = post(client, h, place_id=places[0], species_code="black_porgy")
+    p = post(client, h, place_id=places[0], species_code="black_porgy", location_visibility="place")
     assert p["author"]["nickname"].startswith("t") and p["author"]["title"] == "입문"
     assert p["place_name"] == "테스트 장소 0" and p["species_name"] == "감성돔"
     assert p["mine"] is True and p["comments"] == []
@@ -110,7 +110,14 @@ def test_popular_sort(client):
 
 def test_list_has_catch_region_and_filters(client, places):
     h = signup(client)
-    a = post(client, h, place_id=places[0], species_code="black_porgy", title="지역 필터 글")
+    a = post(
+        client,
+        h,
+        place_id=places[0],
+        species_code="black_porgy",
+        title="지역 필터 글",
+        location_visibility="place",
+    )
     b = post(client, h, species_etc="쥐노래미", title="어종 직접 입력 글")
     listed = client.get(f"{URL}/posts", headers=h).json()
     item = next(x for x in listed if x["id"] == a["id"])
@@ -151,3 +158,47 @@ def test_test_users_are_hidden_from_others(client, places):
     assert client.get(f"{URL}/posts/{p['id']}").status_code == 404
     mine = [x["id"] for x in client.get(f"{URL}/posts", headers=h).json()]
     assert p["id"] in mine  # 본인에게는 보임
+
+
+def _region_id(client) -> int:
+    return next(r["id"] for r in client.get("/api/v1/regions").json() if r["name"] == "테스트 해역")
+
+
+def test_location_visibility(client, places):
+    """낚시터 이름 / 지역만 / 숨김 — 공개하지 않은 범위는 응답에도 검색에도 나오지 않는다"""
+    h, other = signup(client), signup(client)
+    exact = post(client, h, place_id=places[1], title="낚시터 공개", location_visibility="place")
+    region = post(client, h, place_id=places[1], title="지역만 공개")  # 기본값
+    hidden = post(client, h, place_id=places[1], title="위치 숨김", location_visibility="hidden")
+    area = post(client, h, region_id=_region_id(client), title="낚시터 없이 지역만")
+
+    got = {x["id"]: x for x in client.get(f"{URL}/posts", headers=other).json()}
+    assert got[exact["id"]]["place_name"] == "테스트 장소 1"
+    assert got[region["id"]]["place_name"] is None and got[region["id"]]["place_id"] is None
+    assert got[region["id"]]["region_name"] == "테스트 해역"
+    assert got[hidden["id"]]["place_name"] is None and got[hidden["id"]]["region_name"] is None
+    assert (
+        got[area["id"]]["region_name"] == "테스트 해역" and got[area["id"]]["location_visibility"] == "region"
+    )
+
+    by_place = [x["id"] for x in client.get(f"{URL}/posts", params={"place_id": places[1]}).json()]
+    assert exact["id"] in by_place and region["id"] not in by_place and hidden["id"] not in by_place
+    by_sido = [x["id"] for x in client.get(f"{URL}/posts", params={"sido": "테스트"}).json()]
+    assert {exact["id"], region["id"], area["id"]} <= set(by_sido) and hidden["id"] not in by_sido
+
+    # 낚시터 없이 「낚시터 이름 공개」는 불가, 없는 지역도 불가
+    bad = {"category": "tip", "title": "제목", "body": "x"}
+    assert (
+        client.post(f"{URL}/posts", json={**bad, "location_visibility": "place"}, headers=h).status_code
+        == 400
+    )
+    assert client.post(f"{URL}/posts", json={**bad, "region_id": 99999}, headers=h).status_code == 400
+
+
+def test_before_id_paging(client):
+    h = signup(client)
+    ids = [post(client, h, title=f"페이지 {i}")["id"] for i in range(3)]
+    first = client.get(f"{URL}/posts", params={"limit": 2}).json()
+    assert [x["id"] for x in first] == ids[::-1][:2]
+    nxt = client.get(f"{URL}/posts", params={"limit": 2, "before_id": first[-1]["id"]}).json()
+    assert nxt[0]["id"] == ids[0]

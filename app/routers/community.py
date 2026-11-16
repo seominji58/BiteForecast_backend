@@ -27,9 +27,15 @@ def list_posts(
     limit: int = 30,
     sido: Annotated[str | None, Query(max_length=10)] = None,
     species: Annotated[str | None, Query(max_length=50)] = None,
+    place_id: int | None = None,
+    before_id: int | None = None,
 ):
-    """글 목록. sido(예: 제주)·species(어종 코드 또는 이름)로 거를 수 있다"""
-    return svc.list_posts(db, user, category, sort, limit, sido, species)
+    """글 목록. sido(예: 제주)·species(어종 코드 또는 이름)·place_id(낚시터)로 거를 수 있다
+
+    - place_id: 낚시터 이름까지 공개한 글만 (지역만·숨김 글은 낚시터로 찾을 수 없다)
+    - before_id: 최신순에서 「더 보기」 — 이 글보다 앞선 글
+    """
+    return svc.list_posts(db, user, category, sort, limit, sido, species, place_id, before_id)
 
 
 @router.post("/posts", response_model=PostDetailOut, status_code=status.HTTP_201_CREATED)

@@ -166,9 +166,13 @@ def test_share_verified_journal(client, device, places):
         photo_ids=[ph["id"]],
         request_verification=True,
     )
-    share = {"category": "question", "title": "오늘 조황", "body": "입질 좋았어요", "journal_id": j["id"]}
-    # 승인 전에는 공유 불가
-    assert client.post(P, json=share, headers=device).status_code == 400
+    share = {
+        "category": "question",
+        "title": "오늘 조황",
+        "body": "입질 좋았어요",
+        "journal_id": j["id"],
+        "location_visibility": "place",
+    }
     client.post(f"/api/v1/admin/verifications/{j['id']}/approve", headers=ADMIN)
     pts = client.get("/api/v1/me/points", headers=device).json()["total_points"]
 
@@ -193,4 +197,33 @@ def test_share_verified_journal(client, device, places):
     )
     again = client.get(f"{P}/{post['id']}", headers=other).json()
     assert again["verified"] is False and again["photos"] == []
+    assert client.get(f"/api/v1/photos/{ph['id']}", headers=other).status_code == 404
+
+
+def test_share_unverified_journal(client, device, places):
+    """인증 없이도 기록을 공유할 수 있다 — 배지는 없고, 반려되면 조과·사진이 숨겨진다"""
+    ph = upload(client, device, color=(9, 99, 9))
+    j = journal(
+        client, device, places[1], species_code="rockfish", count=2, max_length_cm=28, photo_ids=[ph["id"]]
+    )
+    res = client.post(
+        P,
+        json={"category": "catch", "title": "꽝은 면했어요", "body": "우럭 두 마리", "journal_id": j["id"]},
+        headers=device,
+    )
+    assert res.status_code == 201, res.text
+    post = res.json()
+    assert post["verified"] is False and post["catch"]["count"] == 2
+    assert [x["id"] for x in post["photos"]] == [ph["id"]]
+    # 기본 공개 범위는 지역만: 낚시터 이름은 숨기고 지역은 보인다
+    assert post["location_visibility"] == "region" and post["place_name"] is None
+    assert post["region_name"] == "테스트 해역"
+    other = signup(client)
+    assert client.get(f"/api/v1/photos/{ph['id']}", headers=other).status_code == 200
+
+    # 나중에 인증을 신청해 반려되면 조과·사진이 빠진다
+    client.post(f"{J}/{j['id']}/verification", headers=device)
+    client.post(f"/api/v1/admin/verifications/{j['id']}/reject", json={"reason": "확인 불가"}, headers=ADMIN)
+    again = client.get(f"{P}/{post['id']}", headers=other).json()
+    assert again["catch"] is None and again["photos"] == []
     assert client.get(f"/api/v1/photos/{ph['id']}", headers=other).status_code == 404

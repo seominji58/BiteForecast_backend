@@ -214,9 +214,9 @@ def can_view(db: Session, user: AppUser | None, p: Photo, is_admin: bool = False
         post = db.get(Post, p.post_id)
         return post is not None and post.deleted_at is None and not post.hidden
     if p.journal_id is not None:
-        # 인증 완료 일지를 공개 글로 공유했을 때만 그 일지 사진을 다른 사람이 볼 수 있다
+        # 일지를 공개 글로 공유했을 때만 그 일지 사진을 다른 사람이 볼 수 있다 (인증이 반려되면 숨김)
         j = db.get(Journal, p.journal_id)
-        if j is None or j.deleted_at is not None or j.verification_status != VerificationStatus.APPROVED:
+        if j is None or j.deleted_at is not None or j.verification_status == VerificationStatus.REJECTED:
             return False
         shared = db.scalar(
             select(Post.id).where(Post.journal_id == j.id, Post.deleted_at.is_(None), Post.hidden.is_(False))
