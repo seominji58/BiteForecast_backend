@@ -6,6 +6,7 @@ from app.models.enums import DataKind, Metric, PointReason, VerificationStatus
 from app.schemas.common import ORMModel
 from app.schemas.me import MyTitleOut
 from app.schemas.photo import PhotoOut
+from app.schemas.records import MilestoneOut
 
 # 기기 시계 오차 허용
 _FUTURE_TOLERANCE = timedelta(minutes=5)
@@ -113,6 +114,8 @@ class JournalMutationOut(BaseModel):
     total_points: int
     title: MyTitleOut
     title_changed: bool
+    # 방금 저장으로 생긴 첫 포획·최대어 갱신 (생성·수정일 때만, 없으면 None)
+    milestone: MilestoneOut | None = None
 
 
 class SpeciesOut(ORMModel):

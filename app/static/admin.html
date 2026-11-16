@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>입질예보 · 사진 인증 검토</title>
+<title>입질예보 · 관리자 검토</title>
 <style>
   :root { --navy:#0f2a47; --orange:#ee8526; --teal:#0f6e6e; --line:#d8dee6; --muted:#5b6672; --danger:#c62828; --warn:#a15c00; }
   * { box-sizing:border-box; }
@@ -32,15 +32,16 @@
 </head>
 <body>
 <header>
-  <h1>입질예보 · 사진 인증 검토</h1>
+  <h1>입질예보 · 관리자 검토</h1>
   <input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="off">
   <button id="save">연결</button>
 </header>
 <main>
   <div class="row" role="tablist">
-    <button data-status="pending" aria-pressed="true">검토 대기</button>
+    <button data-status="pending" aria-pressed="true">인증 대기</button>
     <button data-status="approved" aria-pressed="false">승인</button>
     <button data-status="rejected" aria-pressed="false">반려</button>
+    <button data-status="reports" aria-pressed="false">신고 검토</button>
   </div>
   <p class="muted">사전 검사(촬영 시각 차이·같은 사진 재사용)는 참고 정보입니다. EXIF 가 없다는 이유만으로 반려하지 마세요. 승인 시에만 포인트가 지급되며, 같은 기록은 몇 번 승인해도 한 번만 반영됩니다.</p>
   <div id="msg" class="muted" role="status"></div>
@@ -115,7 +116,43 @@ async function act(id, kind, body) {
   } catch (e) { $('#msg').textContent = '실패: ' + e.message; }
 }
 
+function renderReports(items) {
+  const list = $('#list');
+  list.innerHTML = items.length ? '' : '<div class="card muted">검토할 신고가 없습니다.</div>';
+  for (const it of items) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="row"><span class="status">${it.target_type === 'post' ? '글' : '댓글'} #${it.target_id} · 신고 ${it.report_count}건</span>
+        <span class="muted">${esc(it.author)} · 작성 ${fmt(it.created_at)} · 첫 신고 ${fmt(it.first_reported_at)}</span></div>
+      <div class="${it.hidden ? 'flag' : 'ok'}">${it.deleted ? '작성자가 삭제함' : it.hidden ? '지금 숨김 상태 (신고 누적)' : '지금 공개 상태'}</div>
+      ${it.title ? `<div><b>${esc(it.title)}</b></div>` : `<div class="muted">글 #${it.post_id}의 댓글</div>`}
+      <div style="white-space:pre-wrap">${esc(it.body)}</div>
+      <div class="muted">신고 사유: ${it.reasons.map(esc).join(' · ')}</div>
+      <div class="row">
+        <button class="danger" data-act="hide">숨김 처리</button>
+        <button data-act="restore">문제 없음 · 공개</button>
+      </div>`;
+    card.querySelector('[data-act=hide]').addEventListener('click', () => review(it, 'hide'));
+    card.querySelector('[data-act=restore]').addEventListener('click', () => review(it, 'restore'));
+    list.appendChild(card);
+  }
+}
+
+async function review(it, action) {
+  try {
+    await call(`/admin/reports/${it.target_type}/${it.target_id}/review`, { method:'POST', body: JSON.stringify({ action }) });
+    $('#msg').textContent = `${it.target_type === 'post' ? '글' : '댓글'} #${it.target_id} ${action === 'hide' ? '숨김' : '공개'} 처리`;
+    load();
+  } catch (e) { $('#msg').textContent = '실패: ' + e.message; }
+}
+
 async function load() {
+  if (status === 'reports') {
+    try { renderReports(await call('/admin/reports')); }
+    catch (e) { $('#list').innerHTML = ''; $('#msg').textContent = '불러오지 못했습니다: ' + e.message; }
+    return;
+  }
   try { render(await call(`/admin/verifications?status=${status}`)); }
   catch (e) { $('#list').innerHTML = ''; $('#msg').textContent = '불러오지 못했습니다: ' + e.message; }
 }

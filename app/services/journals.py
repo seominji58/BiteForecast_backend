@@ -131,8 +131,11 @@ def _finish(db: Session, user: AppUser, journal: Journal | None) -> JournalMutat
     if journal is not None:
         db.expire(journal)
         journal = get_owned(db, user, journal.id)
+    from app.services.records import milestone  # 순환 import 피함 (records 가 이 모듈을 쓴다)
+
     return JournalMutationOut(
         journal=to_out(db, journal) if journal is not None else None,
+        milestone=milestone(db, user, journal) if journal is not None else None,
         point_delta=delta,
         total_points=after.total_points,
         title=after,

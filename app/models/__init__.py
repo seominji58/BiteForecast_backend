@@ -1,5 +1,5 @@
 from app.models.base import Base
-from app.models.community import Comment, ContentReport, Post, PostLike
+from app.models.community import Comment, ContentReport, Post, PostLike, UserBlock
 from app.models.coord import PlaceCoordCheck
 from app.models.fishing import FishingIndex, MarineWarningSnapshot
 from app.models.journal import Journal, JournalEnvSnapshot
@@ -32,6 +32,7 @@ __all__ = [
     "PointLedger",
     "Post",
     "PostLike",
+    "UserBlock",
     "Region",
     "RegulationReport",
     "Restriction",

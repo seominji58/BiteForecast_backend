@@ -7,6 +7,8 @@ from app.models import Favorite, Place, PointLedger
 from app.schemas.journal import MyPointsOut, PointHistoryItem
 from app.schemas.me import MyTitleOut
 from app.schemas.place import PlaceOut
+from app.schemas.records import RecordSummaryOut
+from app.services import records
 from app.services.titles import get_my_title, total_points
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -29,6 +31,12 @@ def my_points(user: CurrentUser, db: DbSession, limit: int = 50):
         total_points=total_points(db, user),
         history=[PointHistoryItem.model_validate(r) for r in rows],
     )
+
+
+@router.get("/records/summary", response_model=RecordSummaryOut)
+def my_records_summary(user: CurrentUser, db: DbSession):
+    """내 낚시 기록 요약: 출조 일수·못 잡은 날·어종별 첫 포획·최대어 (기록 집계, 개인 기록 전체)"""
+    return records.summary(db, user)
 
 
 # --- 즐겨찾기 낚시터 (로그인 필요, 기기를 바꿔도 유지) ---
