@@ -71,6 +71,23 @@ class GoogleIn(BaseModel):
     id_token: str = Field(min_length=20, max_length=4096)
 
 
+class SocialIn(BaseModel):
+    """소셜 로그인: 제공자가 준 토큰(구글·카카오는 ID 토큰) + 서버가 낸 nonce(카카오 필수)"""
+
+    token: str = Field(min_length=20, max_length=8192)
+    nonce: str | None = Field(default=None, max_length=200)
+
+
+class SocialSignupIn(SocialIn):
+    nickname: str
+    agreements: Agreements
+
+    @field_validator("nickname")
+    @classmethod
+    def _nickname(cls, v: str) -> str:
+        return check_nickname(v)
+
+
 class GoogleSignupIn(GoogleIn):
     nickname: str
     agreements: Agreements
@@ -94,7 +111,8 @@ class AccountOut(BaseModel):
     id: int
     nickname: str
     email: str | None
-    provider: Literal["email", "google"]
+    provider: Literal["email", "google", "kakao"]  # 대표 로그인 수단
+    providers: list[str] = []  # 연결된 로그인 수단 전부
     created_at: datetime
 
 
@@ -126,3 +144,17 @@ class GoogleSignupNeeded(BaseModel):
 class NicknameCheckOut(BaseModel):
     available: bool
     message: str | None = None
+
+
+class SignupNeeded(BaseModel):
+    """처음 보는 소셜 계정: 닉네임·약관 동의를 받아 /auth/social/{provider}/signup 으로 다시 보낸다"""
+
+    status: Literal["signup_required"] = "signup_required"
+    provider: str
+    email: str | None
+    name: str | None
+
+
+class NonceOut(BaseModel):
+    nonce: str
+    expires_in: int  # 초

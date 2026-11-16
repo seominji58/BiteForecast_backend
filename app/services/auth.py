@@ -18,7 +18,6 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-import jwt
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
@@ -26,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import (
     Account,
+    AccountIdentity,
     AppUser,
     AuthSession,
     Comment,
@@ -43,8 +43,8 @@ from app.models import (
     TripStop,
 )
 from app.models.base import utcnow
-from app.schemas.auth import AccountOut, Agreements, AuthOut, GoogleSignupNeeded, MergeInfo
-from app.services import photos
+from app.schemas.auth import AccountOut, Agreements, AuthOut, GoogleSignupNeeded, MergeInfo, SignupNeeded
+from app.services import photos, social
 
 # --- 비밀번호 (표준 라이브러리 scrypt) ---
 _N, _R, _P = 2**14, 8, 1
@@ -82,36 +82,22 @@ def _check_rate(email: str) -> None:
         raise HTTPException(status_code=429, detail="로그인 시도가 많아요. 10분 뒤에 다시 시도해 주세요")
 
 
-# --- 구글 ID 토큰 검증 ---
-_GOOGLE_CERTS = "https://www.googleapis.com/oauth2/v3/certs"
-_GOOGLE_ISS = ["accounts.google.com", "https://accounts.google.com"]
-_jwks: jwt.PyJWKClient | None = None
+# --- 소셜 로그인 토큰 검증 (services/social.py) ---
 
 
 def google_client_ids() -> list[str]:
-    return [x.strip() for x in get_settings().google_client_ids.split(",") if x.strip()]
+    return social.google_client_ids()
 
 
 def verify_google_token(token: str) -> dict:
-    """구글이 서명한 ID 토큰인지, 우리 앱(클라이언트 ID)용인지 확인하고 내용을 돌려준다"""
-    global _jwks
-    audiences = google_client_ids()
-    if not audiences:
-        raise HTTPException(
-            status_code=503, detail="구글 로그인이 아직 설정되지 않았어요 (GOOGLE_CLIENT_IDS)"
-        )
-    try:
-        if _jwks is None:
-            _jwks = jwt.PyJWKClient(_GOOGLE_CERTS, cache_keys=True, lifespan=3600)
-        key = _jwks.get_signing_key_from_jwt(token).key
-        claims = jwt.decode(token, key, algorithms=["RS256"], audience=audiences, issuer=_GOOGLE_ISS)
-    except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=401, detail="구글 로그인 정보를 확인하지 못했어요. 다시 시도해 주세요"
-        ) from None
-    if not claims.get("sub"):
-        raise HTTPException(status_code=401, detail="구글 계정 정보가 없어요")
-    return claims
+    """구글 ID 토큰 확인 (테스트에서 이 함수를 바꿔 끼운다)"""
+    return social.verify_google(token)
+
+
+def _claims(provider: str, token: str, nonce: str | None) -> social.SocialClaims:
+    if provider == "google":
+        return social._google_claims(verify_google_token(token))
+    return social.verify(provider, token, nonce)
 
 
 # --- 세션 ---
@@ -154,12 +140,23 @@ def revoke_session(db: Session, token: str) -> None:
 # --- 공통 ---
 
 
+def _providers(a: Account) -> list[str]:
+    """이 계정에 연결된 로그인 수단 (이메일 비밀번호가 있으면 email 먼저)"""
+    out = ["email"] if a.password_hash else []
+    out += sorted({i.provider for i in a.identities})
+    if a.google_sub and "google" not in out:  # 표로 옮기기 전 구글 계정
+        out.append("google")
+    return out or ["email"]
+
+
 def account_out(a: Account) -> AccountOut:
+    providers = _providers(a)
     return AccountOut(
         id=a.id,
         nickname=a.nickname,
         email=a.email,
-        provider="google" if a.google_sub else "email",
+        provider=providers[0],
+        providers=providers,
         created_at=a.created_at,
     )
 
@@ -205,7 +202,7 @@ def _create_account(
     nickname: str,
     email: str | None,
     password_hash: str | None = None,
-    google_sub: str | None = None,
+    identity: social.SocialClaims | None = None,
 ) -> tuple[Account, MergeInfo]:
     if nickname_taken(db, nickname):
         raise HTTPException(status_code=409, detail="이미 쓰고 있는 닉네임이에요")
@@ -223,7 +220,8 @@ def _create_account(
         user_id=user.id,
         email=email,
         password_hash=password_hash,
-        google_sub=google_sub,
+        # 구글은 예전 칸에도 같이 적는다 (0005 로 옮긴 뒤 한 번 배포하는 동안 되돌리기 쉽게)
+        google_sub=identity.subject if identity and identity.provider == "google" else None,
         nickname=nickname,
         nickname_key=nickname.lower(),
         terms_agreed_at=now,
@@ -232,6 +230,9 @@ def _create_account(
     )
     db.add(account)
     db.flush()
+    if identity is not None:
+        db.add(_new_identity(account, identity))
+        db.flush()
     return account, MergeInfo(done=j + p > 0, available=False, journals=j, posts=p)
 
 
@@ -277,8 +278,11 @@ def login_email(db: Session, email: str, password: str, device_id) -> AuthOut:
     if account is None or not verify_password(password, account.password_hash):
         _FAILS[email].append(time.monotonic())
         if account is not None and account.password_hash is None:
+            names = {"google": "구글", "kakao": "카카오"}
+            via = [names.get(x, x) for x in _providers(account) if x != "email"]
+            label = via[0] if via else "다른 방법"
             raise HTTPException(
-                status_code=401, detail="구글로 가입한 계정이에요. 「구글로 계속하기」를 눌러 주세요"
+                status_code=401, detail=f"{label}로 가입한 계정이에요. 「{label}로 계속하기」를 눌러 주세요"
             )
         raise HTTPException(status_code=401, detail="이메일 또는 비밀번호가 맞지 않아요")
     _FAILS.pop(email, None)
@@ -288,43 +292,87 @@ def login_email(db: Session, email: str, password: str, device_id) -> AuthOut:
 # --- 구글 ---
 
 
-def _google_email(claims: dict) -> str | None:
-    email = (claims.get("email") or "").strip().lower()
-    return email if email and claims.get("email_verified") in (True, "true") else None
-
-
-def login_google(db: Session, id_token: str, device_id) -> AuthOut | GoogleSignupNeeded:
-    claims = verify_google_token(id_token)
-    account = db.scalar(
-        select(Account).where(Account.google_sub == claims["sub"], Account.deleted_at.is_(None))
+def _new_identity(account: Account, c: social.SocialClaims) -> AccountIdentity:
+    return AccountIdentity(
+        account_id=account.id, provider=c.provider, subject=c.subject, email=c.email, last_login_at=utcnow()
     )
+
+
+def _find_by_identity(db: Session, c: social.SocialClaims) -> Account | None:
+    account = db.scalar(
+        select(Account)
+        .join(AccountIdentity, AccountIdentity.account_id == Account.id)
+        .where(
+            AccountIdentity.provider == c.provider,
+            AccountIdentity.subject == c.subject,
+            Account.deleted_at.is_(None),
+        )
+    )
+    if account is None and c.provider == "google":
+        # 표로 옮기기 전에 만든 구글 계정
+        account = db.scalar(
+            select(Account).where(Account.google_sub == c.subject, Account.deleted_at.is_(None))
+        )
+        if account is not None and not any(i.provider == "google" for i in account.identities):
+            db.add(_new_identity(account, c))
+    return account
+
+
+def login_social(
+    db: Session, provider: str, token: str, nonce: str | None, device_id
+) -> AuthOut | SignupNeeded:
+    """소셜 로그인. 처음 보는 계정이면 status=signup_required → 닉네임·약관 동의 후 signup_social"""
+    c = _claims(provider, token, nonce)
+    account = _find_by_identity(db, c)
+    if account is None and c.email:
+        # 같은 이메일로 가입한 계정이 있으면 이 수단을 그 계정에 연결 (제공자가 확인한 이메일만, 지금은 구글)
+        account = db.scalar(select(Account).where(Account.email == c.email, Account.deleted_at.is_(None)))
+        if account is not None:
+            if any(i.provider == provider for i in account.identities):
+                account = None  # 이미 다른 같은 제공자 계정이 붙어 있으면 연결하지 않는다
+            else:
+                db.add(_new_identity(account, c))
+                if provider == "google":
+                    account.google_sub = c.subject
     if account is None:
-        email = _google_email(claims)
-        # 같은 이메일로 이메일 가입한 계정이 있으면 구글을 그 계정에 연결 (구글이 확인한 이메일만)
-        if email:
-            account = db.scalar(select(Account).where(Account.email == email, Account.deleted_at.is_(None)))
-            if account is not None:
-                account.google_sub = claims["sub"]
-    if account is None:
-        return GoogleSignupNeeded(email=_google_email(claims), name=claims.get("name"))
+        return SignupNeeded(provider=provider, email=c.email, name=c.name)
+    for i in account.identities:
+        if i.provider == provider:
+            i.last_login_at = utcnow()
     return _login(db, account, device_id)
 
 
-def signup_google(db: Session, id_token: str, nickname: str, agreements: Agreements, device_id) -> AuthOut:
-    claims = verify_google_token(id_token)
-    existing = db.scalar(
-        select(Account).where(Account.google_sub == claims["sub"], Account.deleted_at.is_(None))
-    )
+def signup_social(
+    db: Session,
+    provider: str,
+    token: str,
+    nonce: str | None,
+    nickname: str,
+    agreements: Agreements,
+    device_id,
+) -> AuthOut:
+    c = _claims(provider, token, nonce)
+    existing = _find_by_identity(db, c)
     if existing is not None:
         return _login(db, existing, device_id)
     _require_agreements(agreements)
-    email = _google_email(claims)
+    email = c.email
     if email and db.scalar(select(Account.id).where(Account.email == email)) is not None:
-        email = None  # 이메일은 이미 다른 계정 것 — 구글 계정 ID 로만 로그인
-    account, merge = _create_account(
-        db, device_id=device_id, nickname=nickname, email=email, google_sub=claims["sub"]
-    )
+        email = None  # 이메일은 이미 다른 계정 것 — 이 로그인 수단으로만 로그인
+    account, merge = _create_account(db, device_id=device_id, nickname=nickname, email=email, identity=c)
     return _finish(db, account, merge)
+
+
+# 예전 구글 전용 API (/auth/google, /auth/google/signup) — 같은 처리를 부른다
+def login_google(db: Session, id_token: str, device_id) -> AuthOut | GoogleSignupNeeded:
+    res = login_social(db, "google", id_token, None, device_id)
+    if isinstance(res, SignupNeeded):
+        return GoogleSignupNeeded(email=res.email, name=res.name)
+    return res
+
+
+def signup_google(db: Session, id_token: str, nickname: str, agreements: Agreements, device_id) -> AuthOut:
+    return signup_social(db, "google", id_token, None, nickname, agreements, device_id)
 
 
 # --- 기기 기록 이전 ---
@@ -424,6 +472,7 @@ def delete_account(db: Session, account: Account) -> None:
     db.execute(delete(TripPlan).where(TripPlan.user_id == uid))
     db.execute(delete(PointLedger).where(PointLedger.user_id == uid))
     db.execute(update(AuthSession).where(AuthSession.account_id == account.id).values(revoked_at=now))
+    db.execute(delete(AccountIdentity).where(AccountIdentity.account_id == account.id))
     placeholder = f"탈퇴회원{account.id}"
     account.email = account.google_sub = account.password_hash = None
     account.nickname, account.nickname_key = placeholder, placeholder.lower()
