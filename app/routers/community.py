@@ -5,6 +5,8 @@ from fastapi import APIRouter, Query, status
 from app.api.deps import CurrentUser, DbSession, Reader
 from app.models.community import PostCategory
 from app.schemas.community import (
+    BlockIn,
+    BlockOut,
     CommentIn,
     LikeOut,
     PostDetailOut,
@@ -77,3 +79,19 @@ def unlike(post_id: int, user: CurrentUser, db: DbSession):
 def report(data: ReportIn, user: CurrentUser, db: DbSession):
     """신고 (앱스토어 사용자 생성 콘텐츠 정책: 신고 수단 필수). 누적 시 자동 숨김"""
     return svc.report(db, user, data)
+
+
+@router.post("/blocks", response_model=BlockOut, status_code=status.HTTP_201_CREATED)
+def block(data: BlockIn, user: CurrentUser, db: DbSession):
+    """이 글·댓글 작성자를 차단: 내 화면에서 그 사람의 글·댓글이 보이지 않는다 (상대에게 알리지 않음)"""
+    return svc.block(db, user, data)
+
+
+@router.get("/blocks", response_model=list[BlockOut])
+def list_blocks(user: CurrentUser, db: DbSession):
+    return svc.list_blocks(db, user)
+
+
+@router.delete("/blocks/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unblock(user_id: int, user: CurrentUser, db: DbSession):
+    svc.unblock(db, user, user_id)

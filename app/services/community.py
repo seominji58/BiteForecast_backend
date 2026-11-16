@@ -30,10 +30,13 @@ from app.models.community import (
     PostCategory,
     PostLike,
     ReportTarget,
+    UserBlock,
 )
 from app.models.enums import PhotoPurpose, VerificationStatus
 from app.schemas.community import (
     AuthorOut,
+    BlockIn,
+    BlockOut,
     CatchOut,
     CommentIn,
     CommentOut,
@@ -95,9 +98,19 @@ def _test_user_ids():
     return select(AppUser.id).where(AppUser.is_test.is_(True))
 
 
+def _blocked_ids(user: AppUser):
+    """내가 차단한 사용자 (그 사람의 글·댓글을 나에게 보이지 않게)"""
+    return select(UserBlock.blocked_user_id).where(UserBlock.user_id == user.id)
+
+
 def _visible_posts(user: AppUser):
-    """삭제되지 않았고, 숨김이 아니거나 내 글. 테스트 사용자 글은 일반 화면에서 뺀다 (내 글이면 보임)"""
-    stmt = select(Post).where(Post.deleted_at.is_(None), (Post.hidden.is_(False)) | (Post.user_id == user.id))
+    """삭제되지 않았고, 숨김이 아니거나 내 글. 테스트 사용자 글은 일반 화면에서 뺀다 (내 글이면 보임).
+    내가 차단한 사용자의 글은 뺀다"""
+    stmt = select(Post).where(
+        Post.deleted_at.is_(None),
+        (Post.hidden.is_(False)) | (Post.user_id == user.id),
+        Post.user_id.not_in(_blocked_ids(user)),
+    )
     if not get_settings().show_test_data:
         stmt = stmt.where(Post.user_id.not_in(_test_user_ids()) | (Post.user_id == user.id))
     return stmt
@@ -177,6 +190,8 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
                     species_name=species_name(db, j.species_code, j.species_etc),
                     count=j.count,
                     max_length_cm=j.max_length_cm,
+                    bait=j.bait if p.show_tackle else None,
+                    rig=j.rig if p.show_tackle else None,
                 )
                 if j is not None
                 else None,
@@ -309,6 +324,7 @@ def get_post(db: Session, user: AppUser, post_id: int) -> PostDetailOut:
             Comment.post_id == p.id,
             Comment.deleted_at.is_(None),
             (Comment.hidden.is_(False)) | (Comment.user_id == user.id),
+            Comment.user_id.not_in(_blocked_ids(user)),
         )
         .order_by(Comment.created_at, Comment.id)
     ).all()
@@ -436,10 +452,15 @@ def report(db: Session, user: AppUser, data: ReportIn) -> ReportOut:
         db.rollback()
         return ReportOut(status="already_reported", hidden=target.hidden)
 
+    # 관리자가 이미 검토한 신고는 자동 숨김 기준에서 뺀다 (검토 후 숨김을 해제한 글이 바로 다시 숨지 않게)
     n = db.scalar(
         select(func.count())
         .select_from(ContentReport)
-        .where(ContentReport.target_type == data.target_type, ContentReport.target_id == data.target_id)
+        .where(
+            ContentReport.target_type == data.target_type,
+            ContentReport.target_id == data.target_id,
+            ContentReport.reviewed_at.is_(None),
+        )
     )
     newly_hidden = False
     if n >= get_settings().community_hide_reports and not target.hidden:
@@ -447,3 +468,38 @@ def report(db: Session, user: AppUser, data: ReportIn) -> ReportOut:
         newly_hidden = True
     db.commit()
     return ReportOut(status="received", hidden=newly_hidden)
+
+
+# --- 차단 (서비스 개선 설계 C5): 상대에게 알리지 않고, 내 화면에서만 그 사람의 글·댓글을 숨긴다 ---
+
+
+def block(db: Session, user: AppUser, data: BlockIn) -> BlockOut:
+    model = Post if data.target_type == ReportTarget.POST else Comment
+    target = db.get(model, data.target_id)
+    if target is None or target.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="대상을 찾을 수 없습니다")
+    if target.user_id == user.id:
+        raise HTTPException(status_code=400, detail="나를 차단할 수는 없어요")
+    if db.get(UserBlock, (user.id, target.user_id)) is None:
+        db.add(UserBlock(user_id=user.id, blocked_user_id=target.user_id))
+        db.commit()
+    return list_blocks(db, user, only=target.user_id)[0]
+
+
+def list_blocks(db: Session, user: AppUser, only: int | None = None) -> list[BlockOut]:
+    stmt = select(UserBlock).where(UserBlock.user_id == user.id).order_by(UserBlock.created_at.desc())
+    if only is not None:
+        stmt = stmt.where(UserBlock.blocked_user_id == only)
+    rows = db.scalars(stmt).all()
+    names = nicknames(db, {r.blocked_user_id for r in rows}) if rows else {}
+    return [
+        BlockOut(user_id=r.blocked_user_id, nickname=names[r.blocked_user_id], created_at=r.created_at)
+        for r in rows
+    ]
+
+
+def unblock(db: Session, user: AppUser, blocked_user_id: int) -> None:
+    row = db.get(UserBlock, (user.id, blocked_user_id))
+    if row is not None:
+        db.delete(row)
+        db.commit()

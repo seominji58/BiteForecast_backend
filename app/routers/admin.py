@@ -1,6 +1,8 @@
-"""관리자 사진 인증 검토 (재설계 v2 §9). X-Admin-Token 헤더(ADMIN_TOKEN)로 보호한다.
+"""관리자: 사진 인증 검토 (재설계 v2 §9) · 커뮤니티 신고 검토 (서비스 개선 설계 C5).
+X-Admin-Token 헤더(ADMIN_TOKEN)로 보호한다.
 
-최소 기능: 대기 목록 → 사진·기록·사전 검사 참고 정보 → 승인 / 반려(사유)
+- 인증: 대기 목록 → 사진·기록·사전 검사 참고 정보 → 승인 / 반려(사유)
+- 신고: 검토 전 신고가 있는 글·댓글 → 숨김 유지 / 숨김 해제. 검토한 신고는 자동 숨김 기준에서 빠진다
 """
 
 from datetime import datetime
@@ -10,11 +12,13 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import AdminOnly, DbSession
-from app.models import AppUser, Journal
+from app.models import AppUser, Comment, ContentReport, Journal, Post
+from app.models.base import utcnow
+from app.models.community import ReportTarget
 from app.models.enums import VerificationStatus
 from app.schemas.photo import PhotoOut
 from app.services import photos, verification
@@ -123,6 +127,100 @@ def reject(journal_id: int, data: RejectIn, db: DbSession):
     recompute_points(db, db.get(AppUser, j.user_id))
     db.commit()
     return _item(db, _get(db, journal_id))
+
+
+# --- 커뮤니티 신고 검토 ---
+
+
+class ReportItem(BaseModel):
+    target_type: ReportTarget
+    target_id: int
+    post_id: int  # 댓글이면 그 댓글이 달린 글
+    author: str
+    title: str | None  # 글 제목 (댓글이면 None)
+    body: str
+    hidden: bool
+    deleted: bool
+    report_count: int  # 검토 전 신고 수
+    reasons: list[str]
+    first_reported_at: datetime
+    created_at: datetime
+
+
+class ReviewIn(BaseModel):
+    action: Literal["hide", "restore"]  # 숨김 유지·처리 / 숨김 해제(문제 없음)
+
+
+def _target(db, target_type: ReportTarget, target_id: int) -> Post | Comment:
+    t = db.get(Post if target_type == ReportTarget.POST else Comment, target_id)
+    if t is None:
+        raise HTTPException(status_code=404, detail="대상을 찾을 수 없습니다")
+    return t
+
+
+def _report_item(db, target_type: ReportTarget, target_id: int, reports: list[ContentReport]) -> ReportItem:
+    t = _target(db, target_type, target_id)
+    is_post = target_type == ReportTarget.POST
+    return ReportItem(
+        target_type=target_type,
+        target_id=target_id,
+        post_id=t.id if is_post else t.post_id,
+        # 관리자 화면은 같은 사람인지 구분할 수 있게 내부 번호를 붙인다
+        author=f"{nicknames(db, {t.user_id})[t.user_id]} (#{t.user_id})",
+        title=t.title if is_post else None,
+        body=t.body[:500],
+        hidden=t.hidden,
+        deleted=t.deleted_at is not None,
+        report_count=len(reports),
+        reasons=[r.reason for r in reports],
+        first_reported_at=min(r.created_at for r in reports),
+        created_at=t.created_at,
+    )
+
+
+@router.get("/reports", response_model=list[ReportItem], dependencies=[AdminOnly])
+def list_reports(db: DbSession, limit: int = 50):
+    """검토 전 신고가 있는 글·댓글 (신고 많은 순)"""
+    targets = db.execute(
+        select(ContentReport.target_type, ContentReport.target_id, func.count().label("n"))
+        .where(ContentReport.reviewed_at.is_(None))
+        .group_by(ContentReport.target_type, ContentReport.target_id)
+        .order_by(func.count().desc(), func.min(ContentReport.created_at))
+        .limit(min(max(limit, 1), 200))
+    ).all()
+    out = []
+    for target_type, target_id, _ in targets:
+        reports = db.scalars(
+            select(ContentReport).where(
+                ContentReport.target_type == target_type,
+                ContentReport.target_id == target_id,
+                ContentReport.reviewed_at.is_(None),
+            )
+        ).all()
+        out.append(_report_item(db, ReportTarget(target_type), target_id, list(reports)))
+    return out
+
+
+@router.post("/reports/{target_type}/{target_id}/review", response_model=ReportItem, dependencies=[AdminOnly])
+def review_report(target_type: ReportTarget, target_id: int, data: ReviewIn, db: DbSession):
+    """숨김 유지(hide) 또는 해제(restore). 이 대상의 검토 전 신고를 모두 검토 처리한다"""
+    t = _target(db, target_type, target_id)
+    reports = db.scalars(
+        select(ContentReport).where(
+            ContentReport.target_type == target_type,
+            ContentReport.target_id == target_id,
+            ContentReport.reviewed_at.is_(None),
+        )
+    ).all()
+    if not reports:
+        raise HTTPException(status_code=404, detail="검토할 신고가 없습니다")
+    item = _report_item(db, target_type, target_id, list(reports))
+    t.hidden = data.action == "hide"
+    now = utcnow()
+    for r in reports:
+        r.reviewed_at = now
+    db.commit()
+    return item.model_copy(update={"hidden": t.hidden})
 
 
 _PAGE = Path(__file__).resolve().parent.parent / "static" / "admin.html"

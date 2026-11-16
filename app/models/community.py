@@ -52,6 +52,8 @@ class Post(TimestampMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     hidden: Mapped[bool] = mapped_column(Boolean, default=False)  # 신고 누적으로 숨김
+    # 공유한 기록의 미끼·채비를 글에 함께 보여줄지 (기존 글은 동의 전이므로 false)
+    show_tackle: Mapped[bool] = mapped_column(Boolean, default=True, server_default="0")
 
     comments: Mapped[list["Comment"]] = relationship(back_populates="post")
 
@@ -87,3 +89,16 @@ class ContentReport(TimestampMixin, Base):
     target_id: Mapped[int] = mapped_column(index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"))
     reason: Mapped[str] = mapped_column(String(200))
+    # 관리자가 검토(숨김 유지·해제)한 시각. 자동 숨김 기준은 검토 전 신고만 센다
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+
+class UserBlock(TimestampMixin, Base):
+    """사용자 차단: 차단한 사람에게 차단된 사람의 글·댓글이 보이지 않는다 (상대에게 알리지 않음)"""
+
+    __tablename__ = "user_block"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), primary_key=True)
+    blocked_user_id: Mapped[int] = mapped_column(
+        ForeignKey("app_user.id", ondelete="CASCADE"), primary_key=True
+    )

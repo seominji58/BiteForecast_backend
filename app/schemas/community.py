@@ -31,6 +31,8 @@ class PostIn(BaseModel):
     photo_ids: list[int] = Field(default_factory=list, max_length=10)
     # 내 낚시일지 공유 (조황공유 글). 장소·어종·사진은 일지 것을 쓴다. 인증 완료면 「인증 조황」 배지
     journal_id: int | None = None
+    # 기록 공유 글에 미끼·채비를 함께 보여줄지 (기본 보여줌)
+    show_tackle: bool = True
 
     _s = field_validator("title", "body", mode="before")(_strip)
 
@@ -56,6 +58,9 @@ class CatchOut(BaseModel):
     species_name: str | None
     count: int | None
     max_length_cm: float | None
+    # 작성자가 「채비 같이 보여주기」를 켠 경우만
+    bait: str | None = None
+    rig: str | None = None
 
 
 class PostSummaryOut(BaseModel):
@@ -118,3 +123,16 @@ class ReportIn(BaseModel):
 class ReportOut(BaseModel):
     status: Literal["received", "already_reported"]
     hidden: bool  # 이번 신고로 숨김 처리됐는지
+
+
+class BlockIn(BaseModel):
+    """이 글·댓글을 쓴 사람을 차단"""
+
+    target_type: ReportTarget
+    target_id: int
+
+
+class BlockOut(BaseModel):
+    user_id: int
+    nickname: str
+    created_at: datetime
