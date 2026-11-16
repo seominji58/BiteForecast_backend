@@ -213,7 +213,7 @@ def test_google_links_to_existing_email_account(client, fake_google):
 def test_google_not_configured(client):
     res = client.post(f"{A}/google", json={"id_token": "x" * 40})
     assert res.status_code == 503
-    assert client.get(f"{A}/config").json() == {"google": False, "email": True}
+    assert client.get(f"{A}/config").json() == {"google": False, "kakao": False, "email": True}
 
 
 # --- 탈퇴 ---

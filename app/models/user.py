@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UTCDateTime
@@ -45,6 +45,22 @@ class Account(TimestampMixin, Base):
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     user: Mapped[AppUser] = relationship(back_populates="account")
+    identities: Mapped[list["AccountIdentity"]] = relationship(lazy="selectin")
+
+
+class AccountIdentity(TimestampMixin, Base):
+    """소셜 로그인 수단 (구글·카카오, 이후 네이버). 한 계정에 제공자별로 하나씩 붙는다.
+    이메일 로그인은 account.email·password_hash 를 그대로 쓴다 (이 표에 넣지 않음)"""
+
+    __tablename__ = "account_identity"
+    __table_args__ = (UniqueConstraint("provider", "subject"), UniqueConstraint("account_id", "provider"))
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("account.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(16))  # google | kakao | naver
+    subject: Mapped[str] = mapped_column(String(128))  # 제공자가 주는 사용자 고유 ID
+    email: Mapped[str | None] = mapped_column(String(254))  # 제공자가 확인됨으로 준 이메일만
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
 
 class AuthSession(TimestampMixin, Base):

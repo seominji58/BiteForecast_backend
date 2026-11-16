@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, Query, status
 
@@ -13,10 +13,15 @@ from app.schemas.auth import (
     MergeInfo,
     NicknameCheckOut,
     NicknameIn,
+    NonceOut,
     SignupIn,
+    SignupNeeded,
+    SocialIn,
+    SocialSignupIn,
     check_nickname,
 )
 from app.services import auth as svc
+from app.services import social
 
 router = APIRouter(tags=["auth"])
 
@@ -48,8 +53,32 @@ def google_signup(data: GoogleSignupIn, db: DbSession, device_id: DeviceId = Non
 
 @router.get("/auth/config")
 def auth_config():
-    """앱이 어떤 로그인 버튼을 보여줄지 (구글 클라이언트 ID 가 설정됐는지)"""
-    return {"google": bool(svc.google_client_ids()), "email": True}
+    """앱이 어떤 로그인 버튼을 보여줄지 (서버에 그 제공자 설정이 있는지)"""
+    return {**social.enabled(), "google": bool(svc.google_client_ids()), "email": True}
+
+
+@router.post("/auth/nonce", response_model=NonceOut)
+def auth_nonce():
+    """소셜 로그인 직전에 받는 일회성 값 (카카오 ID 토큰에 들어가 재사용을 막는다, 5분)"""
+    nonce, ttl = social.issue_nonce()
+    return NonceOut(nonce=nonce, expires_in=ttl)
+
+
+@router.post("/auth/social/{provider}", response_model=AuthOut | SignupNeeded)
+def social_login(
+    provider: Literal["google", "kakao"], data: SocialIn, db: DbSession, device_id: DeviceId = None
+):
+    """소셜 로그인 (구글·카카오). 처음 보는 계정이면 status=signup_required"""
+    return svc.login_social(db, provider, data.token, data.nonce, device_id)
+
+
+@router.post("/auth/social/{provider}/signup", response_model=AuthOut, status_code=status.HTTP_201_CREATED)
+def social_signup(
+    provider: Literal["google", "kakao"], data: SocialSignupIn, db: DbSession, device_id: DeviceId = None
+):
+    return svc.signup_social(
+        db, provider, data.token, data.nonce, data.nickname, data.agreements, device_id
+    )
 
 
 @router.get("/auth/nickname-check", response_model=NicknameCheckOut)
