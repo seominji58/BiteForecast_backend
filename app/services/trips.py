@@ -113,12 +113,16 @@ def _participants(db: Session, t: TripPlan) -> set[int]:
     return ids
 
 
-def _journal_ids(db: Session, stop_ids: list[int]) -> dict[int, list[int]]:
-    if not stop_ids:
+def _journal_ids(db: Session, stop_ids: list[int], user: AppUser | None) -> dict[int, list[int]]:
+    """계획 장소별 **내** 기록 ID. 기록은 본인만 열 수 있으므로 다른 참여자 기록은 넣지 않는다
+    (넣으면 「기록 N개 ›」가 남의 기록으로 가서 열리지 않았다)"""
+    if not stop_ids or user is None:
         return {}
     rows = db.execute(
         select(Journal.trip_stop_id, Journal.id)
-        .where(Journal.trip_stop_id.in_(stop_ids), Journal.deleted_at.is_(None))
+        .where(
+            Journal.trip_stop_id.in_(stop_ids), Journal.deleted_at.is_(None), Journal.user_id == user.id
+        )
         .order_by(Journal.id)
     ).all()
     out: dict[int, list[int]] = {}
@@ -148,7 +152,7 @@ def _stop_out(
 
 def to_out(db: Session, t: TripPlan, user: AppUser | None = None) -> TripOut:
     loc = location_ctx(db)  # 위치 판단은 한 번만 읽는다 (장소마다 다시 읽지 않음)
-    journals = _journal_ids(db, [s.id for s in t.stops])
+    journals = _journal_ids(db, [s.id for s in t.stops], user)
     species = db.get(Species, t.species_code) if t.species_code else None
     rows = db.execute(
         select(TripMember.user_id, TripMember.status)
@@ -220,7 +224,7 @@ def list_trips(db: Session, user: AppUser, when: str) -> list[TripListItemOut]:
         stmt = stmt.where(TripPlan.end_date >= today).order_by(TripPlan.start_date, TripPlan.id)
     plans = db.scalars(stmt).all()
     loc = location_ctx(db)
-    journals = _journal_ids(db, [s.id for t in plans for s in t.stops])
+    journals = _journal_ids(db, [s.id for t in plans for s in t.stops], user)
     counts = dict(
         db.execute(
             select(TripMember.plan_id, func.count())
