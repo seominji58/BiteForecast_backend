@@ -85,6 +85,8 @@ DEFAULT_SPECIES = [
     ("webfoot_octopus", "주꾸미"),
     ("cuttlefish", "갑오징어"),
     ("bigfin_squid", "무늬오징어"),
+    ("marbled_flounder", "도다리(문치가자미)"),  # 0006
+    ("red_drum", "점성어"),  # 0006
 ]
 
 
