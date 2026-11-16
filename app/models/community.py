@@ -15,6 +15,14 @@ class PostCategory(StrEnum):
     TIP = "tip"  # 정보·팁
 
 
+class LocationVisibility(StrEnum):
+    """글의 위치 공개 범위 (낚시터 이름은 공공 낚시터 목록의 이름이지 사용자 GPS 가 아니다)"""
+
+    PLACE = "place"  # 낚시터 이름까지
+    REGION = "region"  # 지역(시·군)만
+    HIDDEN = "hidden"  # 위치 숨김
+
+
 class ReportTarget(StrEnum):
     POST = "post"
     COMMENT = "comment"
@@ -29,9 +37,17 @@ class Post(TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(60))
     body: Mapped[str] = mapped_column(Text)
     place_id: Mapped[int | None] = mapped_column(ForeignKey("place.id"))
+    # 낚시터 없이 지역만 고른 글 (낚시터를 고르면 그 낚시터의 지역을 쓴다)
+    region_id: Mapped[int | None] = mapped_column(ForeignKey("region.id"))
+    # 위치 공개 범위. 기존 글은 낚시터를 공개한 상태로 올라갔으므로 place
+    location_visibility: Mapped[LocationVisibility] = mapped_column(
+        str_enum(LocationVisibility),
+        default=LocationVisibility.REGION,
+        server_default=LocationVisibility.PLACE.value,
+    )
     species_code: Mapped[str | None] = mapped_column(ForeignKey("species.code"))
     species_etc: Mapped[str | None] = mapped_column(String(50))  # 목록에 없는 어종 직접 입력
-    # 인증 완료된 내 낚시일지를 공유한 글 (「인증 조황」 배지). 포인트는 일지에서만 계산 — 글로는 지급 안 함
+    # 공유한 내 낚시일지 (인증 완료면 「인증 조황」 배지). 포인트는 일지에서만 계산 — 글로는 지급 안 함
     journal_id: Mapped[int | None] = mapped_column(ForeignKey("journal.id", ondelete="SET NULL"))
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, onupdate=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())

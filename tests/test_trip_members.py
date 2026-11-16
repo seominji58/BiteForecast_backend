@@ -155,9 +155,13 @@ def test_member_can_record_at_trip_stop(client, places):
     assert client.post("/api/v1/journals", json=body, headers=friend).status_code == 201
     # 함께 가지 않는 사람은 연결할 수 없다
     assert client.post("/api/v1/journals", json=body, headers=signup(client)).status_code == 400
-    # 계획 장소에 참여자의 기록도 모인다
-    stops = client.get(f"{URL}/{t['id']}", headers=owner).json()["stops"]
+    # 계획 장소의 기록은 각자 자기 것만 보인다 (기록은 본인만 열 수 있다)
+    stops = client.get(f"{URL}/{t['id']}", headers=friend).json()["stops"]
     assert len(stops[0]["journal_ids"]) == 1
+    assert client.get(f"{URL}/{t['id']}", headers=owner).json()["stops"][0]["journal_ids"] == []
+    listed = {x["id"]: x for x in client.get(URL, params={"when": "past"}, headers=friend).json()}
+    listed.update({x["id"]: x for x in client.get(URL, params={"when": "upcoming"}, headers=friend).json()})
+    assert listed[t["id"]]["journal_count"] == 1
 
 
 def test_account_deletion_cleans_membership(client, places):

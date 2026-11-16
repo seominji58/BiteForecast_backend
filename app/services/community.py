@@ -4,7 +4,11 @@
 - 로그인 없이 기기 사용자로 작성. 표시명은 「낚시인{번호}」 + 현재 칭호
 - 신고 3회(설정값) 누적 시 자동 숨김. 작성자 본인은 자기 글을 계속 볼 수 있다
 - 삭제는 소프트 삭제 (작성자 본인만)
-- 위치는 사용자가 고른 지원 장소만 연결 (GPS 사용 안 함, NFR-01)
+- 위치는 사용자가 고른 지원 장소 또는 지역만 연결 (GPS 사용 안 함, NFR-01)
+- 위치 공개 범위: 낚시터 이름 / 지역만 / 숨김.
+  공개하지 않은 범위는 응답에 넣지 않고, 그 범위로 검색되지도 않는다
+- 낚시일지 공유: 인증 없이도 공유할 수 있다.
+  인증 완료면 「인증 조황」 배지, 인증이 반려되면 조과·사진을 숨긴다
 """
 
 from datetime import timedelta
@@ -17,7 +21,15 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.config import get_settings
 from app.models import Account, AppUser, Journal, Photo, Place, PointLedger, Region, Species, Title
 from app.models.base import utcnow
-from app.models.community import Comment, ContentReport, Post, PostCategory, PostLike, ReportTarget
+from app.models.community import (
+    Comment,
+    ContentReport,
+    LocationVisibility,
+    Post,
+    PostCategory,
+    PostLike,
+    ReportTarget,
+)
 from app.models.enums import PhotoPurpose, VerificationStatus
 from app.schemas.community import (
     AuthorOut,
@@ -124,6 +136,10 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
             .options(selectinload(Place.region))
         )
     }
+    regions = {
+        r.id: r.name
+        for r in db.scalars(select(Region).where(Region.id.in_({x.region_id for x in posts if x.region_id})))
+    }
     species = {
         s.code: s.name_ko
         for s in db.scalars(
@@ -137,7 +153,10 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
         body = " ".join(p.body.split())
         pics = pics_by_post[p.id]
         place = places.get(p.place_id) if p.place_id else None
-        j = _verified_journal(db, p)
+        vis = p.location_visibility
+        region = place.region.name if place else regions.get(p.region_id) if p.region_id else None
+        shown_place = place if vis == LocationVisibility.PLACE else None
+        j = _shared_journal(db, p)
         out.append(
             PostSummaryOut(
                 id=p.id,
@@ -145,9 +164,10 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
                 title=p.title,
                 excerpt=body[:EXCERPT_LEN] + ("…" if len(body) > EXCERPT_LEN else ""),
                 author=authors[p.user_id],
-                place_name=place.name if place else None,
-                place_id=place.id if place else None,
-                region_name=place.region.name if place else None,
+                place_name=shown_place.name if shown_place else None,
+                place_id=shown_place.id if shown_place else None,
+                region_name=region if vis != LocationVisibility.HIDDEN else None,
+                location_visibility=vis,
                 catch=CatchOut(
                     fished_at=j.fished_at,
                     species_name=species_name(db, j.species_code, j.species_etc),
@@ -163,7 +183,7 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
                 mine=p.user_id == user.id,
                 popular=likes.get(p.id, 0) >= popular_min,
                 created_at=p.created_at,
-                verified=_verified_journal(db, p) is not None,
+                verified=j is not None and j.verification_status == VerificationStatus.APPROVED,
                 photo_count=len(pics),
                 thumb=photos.photo_out(pics[0]) if pics else None,
             )
@@ -171,14 +191,17 @@ def _summaries(db: Session, user: AppUser, posts: list[Post]) -> list[PostSummar
     return out
 
 
-def _verified_journal(db: Session, p: Post) -> Journal | None:
-    """공유된 일지가 지금도 인증 완료 상태일 때만 (반려·삭제되면 배지가 빠진다)"""
+def _journal_shown(j: Journal | None) -> bool:
+    """공유한 일지의 조과·사진을 보여 줄지: 삭제되지 않았고 인증이 반려되지 않았을 때"""
+    return j is not None and j.deleted_at is None and j.verification_status != VerificationStatus.REJECTED
+
+
+def _shared_journal(db: Session, p: Post) -> Journal | None:
+    """공유한 일지 (삭제·인증 반려면 None). 인증 완료 여부는 배지로만 구분한다"""
     if p.journal_id is None:
         return None
     j = db.get(Journal, p.journal_id)
-    if j is None or j.deleted_at is not None or j.verification_status != VerificationStatus.APPROVED:
-        return None
-    return j
+    return j if _journal_shown(j) else None
 
 
 def _photos_by_post(db: Session, posts: list[Post]) -> dict[int, list[Photo]]:
@@ -187,7 +210,7 @@ def _photos_by_post(db: Session, posts: list[Post]) -> dict[int, list[Photo]]:
     journals = {
         j.id: j
         for j in (db.scalars(select(Journal).where(Journal.id.in_(jids))) if jids else [])
-        if j.deleted_at is None and j.verification_status == VerificationStatus.APPROVED
+        if _journal_shown(j)
     }
     post_ids = [p.id for p in posts if p.journal_id is None]
     rows = db.scalars(
@@ -208,8 +231,8 @@ def _photos_by_post(db: Session, posts: list[Post]) -> dict[int, list[Photo]]:
 
 
 def _post_photos(db: Session, p: Post) -> list[Photo]:
-    """글 사진: 일지 공유 글이면 (인증 완료 상태일 때) 일지 사진, 아니면 글에 올린 사진"""
-    j = _verified_journal(db, p)
+    """글 사진: 일지 공유 글이면 (삭제·반려가 아닐 때) 일지 사진, 아니면 글에 올린 사진"""
+    j = _shared_journal(db, p)
     if j is not None:
         cond = Photo.journal_id == j.id
     elif p.journal_id is not None:
@@ -229,13 +252,22 @@ def list_posts(
     limit: int,
     sido: str | None = None,
     species: str | None = None,
+    place_id: int | None = None,
+    before_id: int | None = None,
 ) -> list[PostSummaryOut]:
     stmt = _visible_posts(user)
-    # 지역(시·도, 예: 「제주」 「충남」): 글에 태그한 낚시터의 지역 이름이 그 시·도로 시작
+    # 지역(시·도, 예: 「제주」 「충남」): 글의 낚시터 또는 고른 지역이 그 시·도. 위치를 숨긴 글은 제외
     if sido:
         sido = sido.strip()
-        in_sido = select(Place.id).join(Region).where((Region.name == sido) | Region.name.like(f"{sido} %"))
-        stmt = stmt.where(Post.place_id.in_(in_sido))
+        regions = select(Region.id).where((Region.name == sido) | Region.name.like(f"{sido} %"))
+        in_sido = select(Place.id).where(Place.region_id.in_(regions))
+        stmt = stmt.where(
+            Post.location_visibility != LocationVisibility.HIDDEN,
+            Post.place_id.in_(in_sido) | (Post.place_id.is_(None) & Post.region_id.in_(regions)),
+        )
+    # 낚시터: 낚시터 이름까지 공개한 글만
+    if place_id is not None:
+        stmt = stmt.where(Post.place_id == place_id, Post.location_visibility == LocationVisibility.PLACE)
     # 어종: 목록 어종 코드 또는 직접 입력한 어종 이름
     if species:
         stmt = stmt.where((Post.species_code == species) | (Post.species_etc == species))
@@ -251,7 +283,9 @@ def list_posts(
         posts.sort(key=lambda p: (likes.get(p.id, 0) + comments.get(p.id, 0), p.created_at), reverse=True)
         posts = posts[:limit]
     else:
-        posts = list(db.scalars(stmt.order_by(Post.created_at.desc(), Post.id.desc()).limit(limit)).all())
+        if before_id is not None:
+            stmt = stmt.where(Post.id < before_id)
+        posts = list(db.scalars(stmt.order_by(Post.id.desc()).limit(limit)).all())
     return _summaries(db, user, posts)
 
 
@@ -295,13 +329,15 @@ def get_post(db: Session, user: AppUser, post_id: int) -> PostDetailOut:
 def create_post(db: Session, user: AppUser, data: PostIn) -> PostDetailOut:
     values = data.model_dump(exclude={"photo_ids", "journal_id"})
     if data.journal_id is not None:
-        # 인증 완료된 내 일지 공유: 조황공유 글, 장소·어종·사진은 일지 것을 그대로 쓴다 (포인트 지급 없음)
+        # 내 일지 공유: 조황공유 글, 장소·어종·사진은 일지 것을 그대로 쓴다 (포인트 지급 없음)
+        # 인증은 필요 없다 — 인증 완료면 「인증 조황」 배지가 붙는다. 반려된 기록은 공유하지 않는다
         j = db.get(Journal, data.journal_id)
         if j is None or j.user_id != user.id or j.deleted_at is not None:
             raise HTTPException(status_code=404, detail="공유할 기록을 찾을 수 없습니다")
-        if j.verification_status != VerificationStatus.APPROVED:
+        if j.verification_status == VerificationStatus.REJECTED:
             raise HTTPException(
-                status_code=400, detail="인증이 완료된 기록만 「인증 조황」으로 공유할 수 있습니다"
+                status_code=400,
+                detail="인증이 반려된 기록은 공유할 수 없어요. 기록을 고친 뒤 다시 시도해 주세요",
             )
         if db.scalar(select(Post.id).where(Post.journal_id == j.id, Post.deleted_at.is_(None))):
             raise HTTPException(status_code=409, detail="이미 커뮤니티에 공유한 기록입니다")
@@ -321,6 +357,15 @@ def create_post(db: Session, user: AppUser, data: PostIn) -> PostDetailOut:
                 raise HTTPException(status_code=400, detail="지원하지 않는 장소입니다")
         if data.species_code and db.get(Species, data.species_code) is None:
             raise HTTPException(status_code=400, detail="알 수 없는 어종 코드입니다")
+    # 지역: 낚시터가 있으면 그 낚시터의 지역을 쓰므로 따로 저장하지 않는다
+    if values["place_id"] is not None:
+        values["region_id"] = None
+    elif data.region_id is not None:
+        region = db.get(Region, data.region_id)
+        if region is None or not region.is_active:
+            raise HTTPException(status_code=400, detail="지원하지 않는 지역입니다")
+    if data.location_visibility == LocationVisibility.PLACE and values["place_id"] is None:
+        raise HTTPException(status_code=400, detail="낚시터 이름을 공개하려면 낚시터를 골라 주세요")
     p = Post(user_id=user.id, **values)
     db.add(p)
     db.flush()
