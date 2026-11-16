@@ -171,6 +171,7 @@ def place_out(db: Session, place: Place, ctx: LocationCtx | None = None) -> Plac
         update={
             "location_suspect": place.id in ctx.suspects,
             "coord": ctx.coords.get(place.id),
+            "info_species": (place.info.species or None) if place.info else None,
         }
     )
 

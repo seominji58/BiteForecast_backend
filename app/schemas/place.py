@@ -42,6 +42,8 @@ class PlaceOut(ORMModel):
     location_suspect: bool = False
     # 좌표 검증 기록이 없으면 None (판단 안 됨)
     coord: CoordOut | None = None
+    # 낚시터 안내 어종 (전국낚시터정보표준데이터 원문, 예: 「우럭+참돔+농어 등」). 조황이 아니라 업소가 알린 대상 어종
+    info_species: str | None = None
 
 
 class PlaceInfoOut(ORMModel):

@@ -255,3 +255,14 @@ def test_reference_warning_never_says_none(client, place):
             db.delete(db.get(MarineWarningSnapshot, snap_id))
             db.commit()
         summary_service._cache.clear()
+
+
+def test_place_list_has_info_species(client, place):
+    """낚시터 안내 어종(업소가 알린 대상 어종 원문)이 목록에 실린다 — 지도 어종 찾기용"""
+    from app.models import PlaceInfo
+
+    assert _api_place(client, place)["info_species"] is None
+    with SessionLocal() as db:
+        db.add(PlaceInfo(place_id=place, source="test", species="우럭+참돔 등"))
+        db.commit()
+    assert _api_place(client, place)["info_species"] == "우럭+참돔 등"
