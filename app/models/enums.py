@@ -64,6 +64,8 @@ class RestrictionType(StrEnum):
     FISHING = "fishing"
     ACCESS = "access"
     OTHER = "other"
+    # 해양경찰청 연안사고 위험구역 — 금지가 아니라 사고 위험 경고 (2026-11-17). DB 는 문자열 칸
+    COASTAL_DANGER = "coastal_danger"
 
 
 class RegulationStatus(StrEnum):

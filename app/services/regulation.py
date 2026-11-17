@@ -72,6 +72,9 @@ def evaluate(db: Session, place_id: int, day: date, rows: list[Restriction] | No
                 valid_from=r.valid_from,
                 valid_to=r.valid_to,
                 verified_at=r.verified_at,
+                remarks=r.remarks,
+                published_at=r.published_at,
+                geometry_source=r.geometry_source,
             )
             for r in active
         ],

@@ -63,6 +63,8 @@ class PlaceSummaryOut(BaseModel):
     # 일출·일몰 (KST HH:MM, 낚시터 좌표로 계산)
     sunrise: str | None = None
     sunset: str | None = None
+    # 출입통제구역·연안사고 위험구역 짧은 안내 (해양경찰청 2023 공간정보와 좌표 대조). 금지 판정이 아니다
+    zone_notes: list[str] = []
 
 
 class MidSeaPeriodOut(BaseModel):

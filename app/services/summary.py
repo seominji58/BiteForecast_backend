@@ -159,6 +159,17 @@ def _calendar(place: Place, day: date, sea: str | None) -> dict:
     return out
 
 
+def _zone_notes(reg) -> list[str]:
+    """규제 자료에서 지도 카드용 짧은 안내 (출입통제 먼저)"""
+    notes = []
+    for it in sorted(reg.items, key=lambda r: 0 if r.restriction_type == "access" else 1):
+        if it.restriction_type == "access":
+            notes.append("출입통제구역 공고 범위" + (" 안" if it.status == "CONDITIONAL" else " 근처"))
+        elif it.restriction_type == "coastal_danger":
+            notes.append("연안사고 위험구역" + ("" if "안에 있음" in (it.remarks or "") else " 근처"))
+    return list(dict.fromkeys(notes))
+
+
 def _mid_for(seas: list[str], mid: dict[str, MidSeaOut]) -> MidSeaOut | None:
     """낚시터가 속한 해역(특보 해역 이름) 중 중기해상예보가 있는 첫 해역"""
     return next((mid[s] for s in seas if s in mid), None)
@@ -212,6 +223,7 @@ def summarize_place(
         index=_index(pc),
         mid_sea=_mid_for(pc.warning.seas, mid),
         **_calendar(place, day, _sea_group(pc.warning.seas)),
+        zone_notes=_zone_notes(pc.regulation),
     )
 
 

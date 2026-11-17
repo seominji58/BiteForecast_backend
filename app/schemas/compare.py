@@ -74,6 +74,10 @@ class RestrictionOut(BaseModel):
     valid_from: date | None
     valid_to: date | None
     verified_at: date | None
+    # 구역 이름·거리·위험 이유 등 (예: 「구봉도 주변 해상 · 안에 있음」). 기준일과 출처는 published_at·geometry_source
+    remarks: str | None = None
+    published_at: date | None = None
+    geometry_source: str | None = None
 
 
 class RegulationOut(BaseModel):
