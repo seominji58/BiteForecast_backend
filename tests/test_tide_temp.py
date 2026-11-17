@@ -59,3 +59,32 @@ def test_no_temp_for_future_date(client):
     pid, _ = _setup(with_buoy=False)
     s = _temp_series(client, pid, today_kst() + timedelta(days=1))
     assert s["status"] == "unavailable"
+
+
+def test_station_unavailable_is_not_an_error(client):
+    """관측소·센서 일시 중단(40·41)은 수집 오류로 세지 않는다 — 매시간 「일부 실패」로 보이지 않게"""
+    from collections import Counter
+
+    from app.clients.khoa import KhoaError
+    from app.core.db import SessionLocal
+    from app.jobs.collect import _collect_tide_temp
+    from app.models import Station
+    from app.models.enums import StationKind
+
+    class Fake:
+        def __init__(self, code):
+            self.code = code
+
+        def tide_water_temp(self, obs, day):
+            raise KhoaError(self.code, "test")
+
+    with SessionLocal() as db:
+        st = Station(provider="KHOA", external_id=f"DT_{uuid.uuid4().hex[:8]}", name="중단 관측소", kind=StationKind.TIDE)
+        db.add(st)
+        db.flush()
+        stats: Counter = Counter()
+        _collect_tide_temp(db, Fake("41"), st, today_kst(), stats, set())
+        assert stats["tide_temp_unavailable"] == 1 and not stats.get("tide_temp_errors")
+        _collect_tide_temp(db, Fake("05"), st, today_kst(), stats, set())
+        assert stats["tide_temp_errors"] == 1  # 진짜 연결 오류는 오류로
+        db.rollback()

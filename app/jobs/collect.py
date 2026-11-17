@@ -266,6 +266,10 @@ def _collect_tide_temp(db, client, st: Station, day: date, stats: Counter, disab
     try:
         rows = client.tide_water_temp(st.external_id, day)
     except KhoaError as e:
+        # 40·41: 그 관측소(또는 수온 센서)가 일시 중단 — 수집 오류가 아니라 「자료 없음」으로 센다
+        if str(e.code) in ("40", "41"):
+            stats["tide_temp_unavailable"] += 1
+            return
         _handle_error(e, "tide_temp", st, day, stats, disabled)
         return
     rows = [r for r in rows if lo <= r[0] < hi]
