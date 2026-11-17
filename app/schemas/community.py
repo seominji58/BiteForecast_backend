@@ -91,6 +91,8 @@ class PostSummaryOut(BaseModel):
 
 class CommentIn(BaseModel):
     body: str = Field(min_length=1, max_length=500)
+    # 대댓글이면 원댓글 id (원댓글에만 달 수 있다)
+    parent_id: int | None = None
 
     _s = field_validator("body", mode="before")(_strip)
 
@@ -101,6 +103,10 @@ class CommentOut(BaseModel):
     author: AuthorOut
     mine: bool
     created_at: datetime
+    # 대댓글이면 원댓글 id. 목록은 작성 순 그대로 평평하게 보내고 앱이 원댓글 아래로 묶는다
+    parent_id: int | None = None
+    # 원댓글이 삭제됐지만 답글이 남아 있을 때의 자리표시 (본문·작성자 비움)
+    deleted: bool = False
 
 
 class PostDetailOut(PostSummaryOut):

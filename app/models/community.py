@@ -65,6 +65,8 @@ class Comment(TimestampMixin, Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     post_id: Mapped[int] = mapped_column(ForeignKey("post.id", ondelete="CASCADE"), index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"))
+    # 대댓글: 원댓글 id (한 단계만 — 답글에 다시 답글은 달 수 없다). 원댓글이면 None
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("comment.id", ondelete="CASCADE"), index=True)
     body: Mapped[str] = mapped_column(Text)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     hidden: Mapped[bool] = mapped_column(Boolean, default=False)

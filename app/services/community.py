@@ -331,20 +331,35 @@ def get_post(db: Session, user: AppUser, post_id: int) -> PostDetailOut:
         .order_by(Comment.created_at, Comment.id)
     ).all()
     authors = _authors(db, {c.user_id for c in comments}) if comments else {}
+    out = [
+        CommentOut(
+            id=c.id,
+            body=c.body,
+            author=authors[c.user_id],
+            mine=c.user_id == user.id,
+            created_at=c.created_at,
+            parent_id=c.parent_id,
+        )
+        for c in comments
+    ]
+    # 원댓글이 지워졌거나(삭제·숨김·차단) 안 보이는데 답글은 보이면, 답글이 고아가 되지 않게 자리표시를 넣는다
+    shown = {c.id for c in comments}
+    missing = sorted({c.parent_id for c in comments if c.parent_id is not None and c.parent_id not in shown})
+    if missing:
+        gone = db.scalars(select(Comment).where(Comment.id.in_(missing))).all()
+        placeholder = AuthorOut(nickname="", title="")
+        for g in gone:
+            out.append(
+                CommentOut(
+                    id=g.id, body="", author=placeholder, mine=False, created_at=g.created_at, deleted=True
+                )
+            )
+        out.sort(key=lambda x: (x.created_at, x.id))
     return PostDetailOut(
         **summary.model_dump(),
         body=p.body,
         photos=[photos.photo_out(x) for x in _post_photos(db, p)],
-        comments=[
-            CommentOut(
-                id=c.id,
-                body=c.body,
-                author=authors[c.user_id],
-                mine=c.user_id == user.id,
-                created_at=c.created_at,
-            )
-            for c in comments
-        ],
+        comments=out,
     )
 
 
@@ -498,7 +513,15 @@ def delete_post(db: Session, user: AppUser, post_id: int) -> None:
 
 def add_comment(db: Session, user: AppUser, post_id: int, data: CommentIn) -> PostDetailOut:
     p = _get_post(db, user, post_id)
-    db.add(Comment(post_id=p.id, user_id=user.id, body=data.body))
+    parent_id = None
+    if data.parent_id is not None:
+        parent = db.get(Comment, data.parent_id)
+        if parent is None or parent.post_id != p.id or parent.deleted_at is not None:
+            raise HTTPException(status_code=404, detail="답글을 달 댓글을 찾을 수 없습니다")
+        if parent.parent_id is not None:
+            raise HTTPException(status_code=400, detail="답글에는 다시 답글을 달 수 없습니다")
+        parent_id = parent.id
+    db.add(Comment(post_id=p.id, user_id=user.id, body=data.body, parent_id=parent_id))
     db.commit()
     return get_post(db, user, p.id)
 
