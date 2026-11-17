@@ -3,7 +3,7 @@
 확인된 엔드포인트 (2026-11-05 실제 호출로 검증):
   https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst
   파라미터: base_date, base_time(0200·0500·…·2300), nx, ny, dataType=JSON
-  사용 항목: WAV, WSD, TMP, POP, SKY, PTY. 약 5일치 시간별 예보
+  사용 항목: WAV, WSD, VEC, TMP, POP, SKY, PTY. 약 5일치 시간별 예보
 """
 
 from dataclasses import dataclass
@@ -30,6 +30,7 @@ class ForecastRow:
     precipitation_probability_pct: float | None
     sky_code: float | None
     precipitation_type_code: float | None
+    wind_direction_deg: float | None = None
 
 
 def latest_base_time(now: datetime) -> datetime:
@@ -68,7 +69,7 @@ class KmaForecastClient(KhoaClient):
         by_time: dict[datetime, dict[str, float | None]] = {}
         for i in items:
             cat = i.get("category")
-            if cat not in ("WAV", "WSD", "TMP", "POP", "SKY", "PTY"):
+            if cat not in ("WAV", "WSD", "VEC", "TMP", "POP", "SKY", "PTY"):
                 continue
             t = datetime.strptime(i["fcstDate"] + i["fcstTime"], "%Y%m%d%H%M").replace(tzinfo=KST)
             by_time.setdefault(t, {})[cat] = _value(i.get("fcstValue"))
@@ -81,6 +82,7 @@ class KmaForecastClient(KhoaClient):
                 precipitation_probability_pct=v.get("POP"),
                 sky_code=v.get("SKY"),
                 precipitation_type_code=v.get("PTY"),
+                wind_direction_deg=v.get("VEC"),
             )
             for t, v in sorted(by_time.items())
         ]

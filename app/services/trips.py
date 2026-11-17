@@ -516,6 +516,7 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
                 # 예보 범위 밖이면 일부만 있는 값(예: 다음 날 00시 한 점)도 쓰지 않는다
                 wave_fc_max=None if pending else sm.wave_fc_max,
                 wind_fc_max=None if pending else sm.wind_fc_max,
+                wind_dir_fc=None if pending else sm.wind_dir_fc,
                 air_temp_fc_min=None if pending else sm.air_temp_fc_min,
                 air_temp_fc_max=None if pending else sm.air_temp_fc_max,
                 pop_fc_max=None if pending else sm.pop_fc_max,

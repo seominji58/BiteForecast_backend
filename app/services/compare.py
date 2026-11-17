@@ -74,6 +74,7 @@ WEATHER_FORECAST_METRICS: list[tuple[Metric, str]] = [
     (Metric.PRECIPITATION_PROBABILITY, "%"),
     (Metric.SKY_STATE, "code"),
     (Metric.PRECIPITATION_TYPE, "code"),
+    (Metric.WIND_DIRECTION, "deg"),
 ]
 
 

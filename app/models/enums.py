@@ -42,6 +42,7 @@ class Metric(StrEnum):
     PRECIPITATION_PROBABILITY = "precipitation_probability"
     SKY_STATE = "sky_state"
     PRECIPITATION_TYPE = "precipitation_type"
+    WIND_DIRECTION = "wind_direction"  # 기상청 단기예보 VEC (deg, 바람이 불어오는 방향). DB 는 문자열 칸 — 마이그레이션 없음
 
 
 class TideExtremeType(StrEnum):

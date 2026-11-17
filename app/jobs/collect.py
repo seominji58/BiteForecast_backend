@@ -250,7 +250,7 @@ def _collect_forecast(
         return
     expected_metrics = (
         Metric.WAVE_HEIGHT, Metric.WIND_SPEED, Metric.AIR_TEMP, Metric.PRECIPITATION_PROBABILITY,
-        Metric.SKY_STATE, Metric.PRECIPITATION_TYPE,
+        Metric.SKY_STATE, Metric.PRECIPITATION_TYPE, Metric.WIND_DIRECTION,
     )
     latest_by_metric = {
         metric: db.scalar(
@@ -289,6 +289,7 @@ def _collect_forecast(
             (Metric.PRECIPITATION_PROBABILITY, "%", r.precipitation_probability_pct),
             (Metric.SKY_STATE, "code", r.sky_code),
             (Metric.PRECIPITATION_TYPE, "code", r.precipitation_type_code),
+            (Metric.WIND_DIRECTION, "deg", r.wind_direction_deg),
         ):
             db.add(
                 OceanReading(

@@ -39,6 +39,8 @@ class PlaceSummaryOut(BaseModel):
     wave_fc_max: ValueAt | None  # 남은 시간(오늘) 또는 그날 예보 최대
     wind_obs: ValueAt | None
     wind_fc_max: ValueAt | None
+    # 가장 센 바람 시각의 풍향 (16방위, 바람이 불어오는 쪽. 예: 북서). 기상청 단기예보 VEC
+    wind_dir_fc: str | None = None
     temp_obs: ValueAt | None
     air_temp_fc_min: ValueAt | None = None
     air_temp_fc_max: ValueAt | None = None

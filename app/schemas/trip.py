@@ -212,6 +212,7 @@ class StopOutlookOut(BaseModel):
     forecast_status: ForecastStatus
     wave_fc_max: ValueAt | None = None
     wind_fc_max: ValueAt | None = None
+    wind_dir_fc: str | None = None  # 가장 센 바람 시각의 풍향 (16방위)
     air_temp_fc_min: ValueAt | None = None
     air_temp_fc_max: ValueAt | None = None
     pop_fc_max: ValueAt | None = None

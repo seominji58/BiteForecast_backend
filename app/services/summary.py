@@ -62,6 +62,22 @@ def _low(s: SeriesOut | None, after: datetime | None) -> ValueAt | None:
     return ValueAt(v=round(p.v, 1), t=p.t) if p else None
 
 
+DIRS16 = ["북", "북북동", "북동", "동북동", "동", "동남동", "남동", "남남동", "남", "남남서", "남서", "서남서", "서", "서북서", "북서", "북북서"]
+
+
+def deg_to_dir16(deg: float) -> str:
+    """풍향(도) → 16방위 (바람이 불어오는 쪽)"""
+    return DIRS16[int((deg % 360) / 22.5 + 0.5) % 16]
+
+
+def _dir_at(s: SeriesOut | None, at: ValueAt | None) -> str | None:
+    """가장 센 바람 시각의 풍향. 그 시각 값이 없으면 None (다른 시각 값으로 채우지 않는다)"""
+    if not s or not s.points or at is None:
+        return None
+    v = next((p.v for p in s.points if p.t == at.t and p.v is not None), None)
+    return deg_to_dir16(v) if v is not None else None
+
+
 def _codes(s: SeriesOut | None, after: datetime | None) -> list[int]:
     """기상청 PTY 코드 목록 (0=없음은 뺀다). 코드 의미는 바꾸지 않는다"""
     if not s:
@@ -186,7 +202,8 @@ def summarize_place(
         wave_obs_km=wave_obs.source.distance_km if wave_obs and wave_obs.source else None,
         wave_fc_max=_peak(_find(pc.series, "wave_height", "forecast"), after),
         wind_obs=_latest(wind_obs),
-        wind_fc_max=_peak(_find(pc.series, "wind_speed", "forecast"), after),
+        wind_fc_max=(wpeak := _peak(_find(pc.series, "wind_speed", "forecast"), after)),
+        wind_dir_fc=_dir_at(_find(pc.series, "wind_direction", "forecast"), wpeak),
         temp_obs=_latest(_find(pc.series, "water_temp", "observed")),
         air_temp_fc_min=_low(_find(pc.series, "air_temp", "forecast"), after),
         air_temp_fc_max=_peak(_find(pc.series, "air_temp", "forecast"), after),

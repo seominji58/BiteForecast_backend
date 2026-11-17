@@ -52,7 +52,7 @@ class SeriesOut(BaseModel):
 
     metric: Literal[
         "tide_extreme", "tide_level", "wave_height", "wind_speed", "water_temp",
-        "air_temp", "precipitation_probability", "sky_state", "precipitation_type",
+        "air_temp", "precipitation_probability", "sky_state", "precipitation_type", "wind_direction",
     ]
     unit: str
     kind: DataKind
