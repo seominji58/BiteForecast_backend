@@ -21,6 +21,7 @@ from app.clients.khoa import (
     EP_FISHING_INDEX,
     EP_TIDE_EXTREME,
     EP_TIDE_HOURLY,
+    EP_TIDE_TEMP,
 )
 from app.clients.kma import AGENCY as KMA_AGENCY
 from app.clients.kma import DATASET as KMA_DATASET
@@ -95,6 +96,8 @@ class Prefetch:
     extremes: dict[int, list[TideExtreme]]
     levels: dict[int, list[TideForecast]]
     observed: dict[tuple[int, Metric], list[OceanReading]]
+    # 조위관측소 실측 수온 (부이 수온이 없을 때 대신) — station_id → 행
+    tide_temp: dict[int, list[OceanReading]]
     forecast: dict[tuple[int, Metric], list[OceanReading]]
     forecast_last: dict[tuple[int, Metric], datetime]
     fishing: dict[int, list[FishingIndex]]
@@ -147,6 +150,20 @@ def prefetch(db: Session, places: list[Place], day: date) -> Prefetch:
         ) if ocean and lo <= now else [],
         lambda r: (r.station_id, r.metric),
     )
+    tide_temp = grouped(
+        db.scalars(
+            select(OceanReading)
+            .where(
+                OceanReading.station_id.in_(tide),
+                OceanReading.metric == Metric.WATER_TEMP,
+                OceanReading.kind == DataKind.OBSERVED,
+                OceanReading.t >= lo,
+                OceanReading.t < min(hi, now),
+            )
+            .order_by(OceanReading.station_id, OceanReading.t)
+        ) if tide and lo <= now else [],
+        lambda r: r.station_id,
+    )
     fc = sorted(ids[StationRole.FORECAST])
     fc_metrics = [*FORECAST_METRICS, *(m for m, _ in WEATHER_FORECAST_METRICS)]
     forecast = grouped(
@@ -198,6 +215,7 @@ def prefetch(db: Session, places: list[Place], day: date) -> Prefetch:
         extremes=extremes,
         levels=levels,
         observed=observed,
+        tide_temp=tide_temp,
         forecast=forecast,
         forecast_last=forecast_last,
         fishing=fishing,
@@ -435,7 +453,26 @@ def _place_compare(db: Session, place: Place, day: date, pf: Prefetch | None = N
 
     # --- 파고·풍속·수온 ---
     ocean = by_role.get(StationRole.OCEAN)
+    tide_st = by_role.get(StationRole.TIDE)
     for metric, unit in OCEAN_METRICS:
+        # 수온: 부이 실측이 없으면 같은 바다 조위관측소의 실측 수온으로 (출처를 조위관측소로 밝힌다)
+        if metric == Metric.WATER_TEMP and lo <= now and tide_st is not None:
+            buoy_rows = pf.observed.get((ocean.station_id, metric), []) if ocean else []
+            trows = [] if buoy_rows else pf.tide_temp.get(tide_st.station_id, [])
+            if trows:
+                series.append(
+                    SeriesOut(
+                        metric=metric.value,
+                        unit=unit,
+                        kind=DataKind.OBSERVED,
+                        status="ok",
+                        source=_source(tide_st, EP_TIDE_TEMP),
+                        issued_at=trows[-1].t,
+                        fetched_at=max(r.fetched_at for r in trows),
+                        points=[PointOut(t=r.t, v=r.value) for r in trows],
+                    )
+                )
+                continue
         # 실측: 미래 날짜에는 없다. 실측을 예보처럼 보여주지 않는다 (FR-04)
         if ocean is None:
             series.append(_unavailable(metric.value, unit, DataKind.OBSERVED, "NO_STATION"))
@@ -445,6 +482,7 @@ def _place_compare(db: Session, place: Place, day: date, pf: Prefetch | None = N
             )
         else:
             rows = pf.observed.get((ocean.station_id, metric), [])
+            src = _source(ocean, EP_BUOY)
             series.append(
                 SeriesOut(
                     metric=metric.value,
@@ -452,7 +490,7 @@ def _place_compare(db: Session, place: Place, day: date, pf: Prefetch | None = N
                     kind=DataKind.OBSERVED,
                     status="ok" if rows else "unavailable",
                     reason=None if rows else "NO_DATA",
-                    source=_source(ocean, EP_BUOY),
+                    source=src,
                     issued_at=rows[-1].t if rows else None,
                     fetched_at=max((r.fetched_at for r in rows), default=None),
                     points=[PointOut(t=r.t, v=r.value) for r in rows] if rows else None,

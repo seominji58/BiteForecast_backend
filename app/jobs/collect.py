@@ -100,6 +100,12 @@ def collect_once(client: KmaForecastClient | None = None) -> Counter:
                     _collect_buoy(db, client, st, day, stats, disabled)
                 db.commit()
 
+            # 조위관측소 실측 수온 (부이가 없는 낚시터용). 어제·오늘만
+            for st in _mapped_stations(db, StationRole.TIDE):
+                for day in past[-2:]:
+                    _collect_tide_temp(db, client, st, day, stats, disabled)
+                db.commit()
+
             base = latest_base_time(utcnow())
             for st in _mapped_stations(db, StationRole.FORECAST):
                 _collect_forecast(db, client, st, base, stats, disabled)
@@ -240,6 +246,39 @@ def _collect_buoy(db, client, st: Station, day: date, stats: Counter, disabled: 
                 )
             )
     stats["buoy_rows"] += len(rows)
+
+
+def _collect_tide_temp(db, client, st: Station, day: date, stats: Counter, disabled: set) -> None:
+    """조위관측소 실측 수온 → OceanReading(water_temp, observed, 조위관측소). 부이 수집과 같은 규칙"""
+    if "tide_temp" in disabled:
+        return
+    lo, hi = kst_day_range(day)
+    cond = (
+        OceanReading.station_id == st.id,
+        OceanReading.metric == Metric.WATER_TEMP,
+        OceanReading.kind == DataKind.OBSERVED,
+        OceanReading.t >= lo,
+        OceanReading.t < hi,
+    )
+    if hi <= utcnow() and db.scalar(select(OceanReading.id).where(*cond, OceanReading.fetched_at >= hi).limit(1)):
+        stats["tide_temp_skipped"] += 1
+        return
+    try:
+        rows = client.tide_water_temp(st.external_id, day)
+    except KhoaError as e:
+        _handle_error(e, "tide_temp", st, day, stats, disabled)
+        return
+    rows = [r for r in rows if lo <= r[0] < hi]
+    db.execute(delete(OceanReading).where(*cond))
+    now = utcnow()
+    for t, v in rows:
+        db.add(
+            OceanReading(
+                station_id=st.id, metric=Metric.WATER_TEMP, kind=DataKind.OBSERVED, t=t,
+                value=v, unit="°C", issued_at=t, fetched_at=now,
+            )
+        )
+    stats["tide_temp_rows"] += len(rows)
 
 
 def _collect_forecast(

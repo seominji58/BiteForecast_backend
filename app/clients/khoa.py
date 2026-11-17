@@ -31,6 +31,8 @@ AGENCY = "국립해양조사원"
 EP_TIDE_EXTREME = "tideFcstHghLw/GetTideFcstHghLwApiService"
 EP_TIDE_HOURLY = "tideFcstTime/GetTideFcstTimeApiService"
 EP_BUOY = "twRecent/GetTWRecentApiService"
+# 조위관측소 실측 수온 (2026-11-17 실제 호출로 확인: obsvtrNm, lat, lot, obsrvnDt, wtem)
+EP_TIDE_TEMP = "surveyWaterTemp/GetSurveyWaterTempApiService"
 # 바다낚시지수: gubun(갯바위/선상) 필수. 2026-11-05 확인 시 두 값의 응답이 동일했다
 EP_FISHING_INDEX = "fcstFishingv2/GetFcstFishingApiServicev2"
 
@@ -39,6 +41,7 @@ DATASET_NAMES = {
     EP_TIDE_HOURLY: "조석예보(시계열)",
     EP_BUOY: "해양관측부이 최신 관측데이터",
     EP_FISHING_INDEX: "바다낚시지수",
+    EP_TIDE_TEMP: "조위관측소 실측 수온",
 }
 
 FISHING_INDEX_LEVELS = ("매우좋음", "좋음", "보통", "나쁨", "매우나쁨")
@@ -236,6 +239,10 @@ class KhoaClient:
                 break
         return rows
 
+    def tide_water_temp(self, obs_code: str, day: date) -> list[tuple]:
+        """조위관측소 실측 수온 (시각, °C). 부이가 먼 낚시터의 수온 대신 쓴다"""
+        return _tide_temp_rows(self._get(EP_TIDE_TEMP, {"obsCode": obs_code, "reqDate": day.strftime("%Y%m%d"), "min": 60}))
+
     def buoy_observations(self, obs_code: str, day: date) -> list[BuoyRow]:
         items = self._get(EP_BUOY, {"obsCode": obs_code, "reqDate": day.strftime("%Y%m%d"), "min": 60})
         rows = [
@@ -249,6 +256,13 @@ class KhoaClient:
             if i.get("obsrvnDt")
         ]
         return sorted(rows, key=lambda r: r.t)
+
+
+def _tide_temp_rows(items: list[dict]) -> list[tuple]:
+    return sorted(
+        ((parse_kst(i["obsrvnDt"]), _num(i.get("wtem"))) for i in items if i.get("obsrvnDt")),
+        key=lambda r: r[0],
+    )
 
 
 def _parse_tide_hourly(items: list[dict]) -> list[TideLevelRow]:
