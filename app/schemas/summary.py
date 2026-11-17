@@ -53,6 +53,23 @@ class PlaceSummaryOut(BaseModel):
     next_tide: TideEventOut | None = None
     # 그날 만조·간조 전부 (같은 바다 조위관측소 예보일 때만). 전체 요약 응답에서는 빼서 보낸다
     tides: list[TideEventOut] = Field(default_factory=list, exclude=True)
+    # 기상청 중기해상예보 (4~10일 뒤, 해역 단위 파고 범위). 단기예보가 없는 날의 참고 — 조건 판정에 쓰지 않는다
+    mid_sea: "MidSeaOut | None" = None
+
+
+class MidSeaPeriodOut(BaseModel):
+    period: Literal["am", "pm", "day"]
+    wave_min: float | None
+    wave_max: float | None
+    weather: str | None
+
+
+class MidSeaOut(BaseModel):
+    region: str  # 예: 서해중부 (기상청 중기해상 구역)
+    wave_min: float | None  # 그날 오전·오후 중 최저
+    wave_max: float | None  # 그날 오전·오후 중 최고
+    periods: list[MidSeaPeriodOut]
+    issued_at: datetime
 
 
 class DataStatusOut(BaseModel):
@@ -77,3 +94,6 @@ class PlacesSummaryOut(BaseModel):
     places: list[PlaceSummaryOut]
     disclaimer: str
     data_status: DataStatusOut
+
+
+PlaceSummaryOut.model_rebuild()

@@ -30,6 +30,8 @@ from sqlalchemy.orm import Session
 
 from app.clients.khoa import BuoyRow, KhoaError
 from app.clients.kma import KmaForecastClient, latest_base_time
+from app.clients.kma_mid_sea import REGIONS as MID_SEA_REGIONS
+from app.clients.kma_mid_sea import KmaMidSeaClient, latest_tm_fc
 from app.clients.kma_warning import KmaWarningClient
 from app.core import logsafe
 from app.core.config import get_settings
@@ -40,6 +42,7 @@ from app.models import (
     FishingIndex,
     Journal,
     MarineWarningSnapshot,
+    MidSeaForecast,
     OceanReading,
     PlaceStation,
     Station,
@@ -106,6 +109,9 @@ def collect_once(client: KmaForecastClient | None = None) -> Counter:
             db.commit()
 
             _collect_warnings(db, client, stats)
+            db.commit()
+
+            _collect_mid_sea(db, client, stats)
             db.commit()
 
             # 일지 환경정보 재연결 (수집 기간에 출조한 일지)
@@ -379,6 +385,39 @@ def _collect_warnings(db, client, stats: Counter) -> None:
     if old:
         db.execute(delete(MarineWarningSnapshot).where(MarineWarningSnapshot.id.in_(old)))
     stats["warning_snapshots"] += 1
+
+
+def _collect_mid_sea(db, client, stats: Counter) -> None:
+    """기상청 중기해상예보 (4~10일 뒤 해역별 파고 범위). 발표가 하루 두 번이라 같은 발표분은 다시 받지 않는다"""
+    tm = latest_tm_fc(utcnow())
+    if db.scalar(select(MidSeaForecast.id).where(MidSeaForecast.tm_fc == tm).limit(1)):
+        stats["mid_sea_skipped"] += 1
+        return
+    mc = KmaMidSeaClient(api_key=client.api_key, http=client.http)
+    now = utcnow()
+    for name, reg_id in MID_SEA_REGIONS.items():
+        try:
+            rows = mc.fetch(reg_id, tm)
+        except KhoaError as e:
+            log.error("중기해상예보 수집 실패 %s: %s", name, e)
+            stats["mid_sea_errors"] += 1
+            continue
+        for r in rows:
+            db.add(
+                MidSeaForecast(
+                    region=name,
+                    tm_fc=tm,
+                    target_date=r.target_date.isoformat(),
+                    period=r.period,
+                    wave_min=r.wave_min,
+                    wave_max=r.wave_max,
+                    weather=r.weather,
+                    fetched_at=now,
+                )
+            )
+        stats["mid_sea_rows"] += len(rows)
+    # 오래된 발표분 정리 (3일 넘은 것)
+    db.execute(delete(MidSeaForecast).where(MidSeaForecast.tm_fc < tm - timedelta(days=3)))
 
 
 def _handle_error(e: KhoaError, dataset: str, st: Station, day: date, stats: Counter, disabled: set) -> None:

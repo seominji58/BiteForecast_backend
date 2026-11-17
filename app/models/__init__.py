@@ -3,7 +3,7 @@ from app.models.community import Comment, ContentReport, Post, PostLike, UserBlo
 from app.models.coord import PlaceCoordCheck
 from app.models.fishing import FishingIndex, MarineWarningSnapshot
 from app.models.journal import Journal, JournalEnvSnapshot
-from app.models.ocean import OceanReading, TideExtreme, TideForecast
+from app.models.ocean import MidSeaForecast, OceanReading, TideExtreme, TideForecast
 from app.models.photo import Photo
 from app.models.place import Place, PlaceInfo, PlaceStation, Region, Species, Station
 from app.models.points import PointLedger, Title
@@ -24,6 +24,7 @@ __all__ = [
     "Journal",
     "JournalEnvSnapshot",
     "MarineWarningSnapshot",
+    "MidSeaForecast",
     "OceanReading",
     "Photo",
     "Place",

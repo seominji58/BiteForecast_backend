@@ -14,10 +14,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.timeutil import today_kst
-from app.models import Place, PlaceStation
+from app.models import MidSeaForecast, Place, PlaceStation
 from app.models.base import utcnow
 from app.schemas.compare import SeriesOut
-from app.schemas.summary import IndexSummaryOut, PlaceSummaryOut, TideEventOut, ValueAt
+from app.schemas.summary import (
+    IndexSummaryOut,
+    MidSeaOut,
+    MidSeaPeriodOut,
+    PlaceSummaryOut,
+    TideEventOut,
+    ValueAt,
+)
 from app.services.compare import Prefetch, _place_compare, prefetch
 
 KST = ZoneInfo("Asia/Seoul")
@@ -98,8 +105,42 @@ def _sea_group(seas: list[str]) -> str | None:
     return None
 
 
-def summarize_place(db: Session, place: Place, day: date, pf: Prefetch | None = None) -> PlaceSummaryOut:
+def mid_sea_for_day(db: Session, day: date) -> dict[str, MidSeaOut]:
+    """그날의 중기해상예보 (해역별, 가장 최근 발표분). 없으면 빈 dict"""
+    rows = db.scalars(select(MidSeaForecast).where(MidSeaForecast.target_date == day.isoformat())).all()
+    latest: dict[str, datetime] = {}
+    for r in rows:
+        if r.region not in latest or r.tm_fc > latest[r.region]:
+            latest[r.region] = r.tm_fc
+    out: dict[str, MidSeaOut] = {}
+    order = {"am": 0, "pm": 1, "day": 2}
+    for region, tm in latest.items():
+        ps = sorted((r for r in rows if r.region == region and r.tm_fc == tm), key=lambda r: order.get(r.period, 9))
+        mins = [r.wave_min for r in ps if r.wave_min is not None]
+        maxs = [r.wave_max for r in ps if r.wave_max is not None]
+        out[region] = MidSeaOut(
+            region=region,
+            wave_min=min(mins) if mins else None,
+            wave_max=max(maxs) if maxs else None,
+            periods=[
+                MidSeaPeriodOut(period=r.period, wave_min=r.wave_min, wave_max=r.wave_max, weather=r.weather) for r in ps
+            ],
+            issued_at=tm,
+        )
+    return out
+
+
+def _mid_for(seas: list[str], mid: dict[str, MidSeaOut]) -> MidSeaOut | None:
+    """낚시터가 속한 해역(특보 해역 이름) 중 중기해상예보가 있는 첫 해역"""
+    return next((mid[s] for s in seas if s in mid), None)
+
+
+def summarize_place(
+    db: Session, place: Place, day: date, pf: Prefetch | None = None, mid: dict[str, MidSeaOut] | None = None
+) -> PlaceSummaryOut:
     """한 낚시터의 하루 요약 (전체 요약·출조계획 해황이 같이 쓴다)"""
+    if mid is None:
+        mid = mid_sea_for_day(db, day)
     after = utcnow() if day == today_kst() else None
     pc = _place_compare(db, place, day, pf)
     wave_obs = _find(pc.series, "wave_height", "observed")
@@ -139,6 +180,7 @@ def summarize_place(db: Session, place: Place, day: date, pf: Prefetch | None = 
         pop_fc_max=_peak(_find(pc.series, "precipitation_probability", "forecast"), after),
         precipitation_types=_codes(_find(pc.series, "precipitation_type", "forecast"), after),
         index=_index(pc),
+        mid_sea=_mid_for(pc.warning.seas, mid),
     )
 
 
@@ -157,6 +199,7 @@ def summarize(db: Session, day: date) -> list[PlaceSummaryOut]:
         )
     ).all()
     pf = prefetch(db, list(places), day)  # 전체 장소의 하루 자료를 표마다 한 번씩만 읽는다
-    out = [summarize_place(db, place, day, pf) for place in places]
+    mid = mid_sea_for_day(db, day)  # 해역 8곳이라 하루 한 번만 읽는다
+    out = [summarize_place(db, place, day, pf, mid) for place in places]
     _cache[day] = (time.monotonic(), out)
     return out

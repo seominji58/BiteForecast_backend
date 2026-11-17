@@ -53,3 +53,21 @@ class OceanReading(Base):
     # 실측은 issued_at 이 없으므로 t 와 같은 값을 넣어 UNIQUE 제약을 유지한다
     issued_at: Mapped[datetime] = mapped_column(UTCDateTime())
     fetched_at: Mapped[datetime] = mapped_column(UTCDateTime())
+
+
+class MidSeaForecast(Base):
+    """기상청 중기해상예보 (4~10일 뒤, 해역 단위 파고 범위·날씨). 2026-11-16 추가 (0007).
+    낚시터 지점 예보가 아니라 넓은 해역 범위라서 화면에서는 「참고」로만 쓰고 조건 판정에는 쓰지 않는다"""
+
+    __tablename__ = "mid_sea_forecast"
+    __table_args__ = (UniqueConstraint("region", "tm_fc", "target_date", "period"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    region: Mapped[str] = mapped_column(String(20), index=True)  # 서해중부 · 남해동부 · 제주도 …
+    tm_fc: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)  # 발표 시각 (06시·18시 KST)
+    target_date: Mapped[str] = mapped_column(String(10), index=True)  # YYYY-MM-DD (KST)
+    period: Mapped[str] = mapped_column(String(4))  # am · pm · day(8일 뒤부터는 하루 단위)
+    wave_min: Mapped[float | None] = mapped_column(Float)
+    wave_max: Mapped[float | None] = mapped_column(Float)
+    weather: Mapped[str | None] = mapped_column(String(30))
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime())
