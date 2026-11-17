@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     google_client_ids: str = ""
     # 카카오 로그인(OIDC): ID 토큰의 aud 가 이 네이티브 앱 키여야 한다. 비어 있으면 카카오 로그인 비활성
     kakao_native_app_key: str = ""
+    # 카카오 로컬(장소 검색) REST 키 — 서버에서만 쓴다. 앱·로그에 넣지 않는다
+    kakao_rest_key: str = ""
     # 소셜 로그인 nonce 서명 키 (재사용 방지). 비어 있으면 DB 주소에서 만든 값을 쓴다 (서버 여러 대도 같은 값)
     auth_nonce_secret: str = ""
     # 로그인 유지 기간 (마지막 사용 후 이 기간이 지나면 다시 로그인)
