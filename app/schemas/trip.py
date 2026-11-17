@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.place import PlaceOut
-from app.schemas.summary import DataStatusOut, TideEventOut, ValueAt
+from app.schemas.summary import DataStatusOut, MidSeaOut, TideEventOut, ValueAt
 
 # 설계안 §10 (사용자 승인 2026-11-09)
 MAX_DAYS = 7
@@ -223,6 +223,8 @@ class StopOutlookOut(BaseModel):
     tides: list[TideEventOut] = []
     # 특보 안내 (좌표 불일치 의심 곳: 주소 기준 특보의 한계)
     warning_note: str | None = None
+    # 단기예보가 없는 날의 기상청 중기해상예보 (해역 범위, 참고 — 조건 판정에 쓰지 않음)
+    mid_sea: MidSeaOut | None = None
 
 
 class TripOutlookOut(BaseModel):

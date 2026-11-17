@@ -524,6 +524,7 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
                 warning_types=sm.warning_types,
                 warning_is_current=s.day == today,
                 tides=sm.tides,
+                mid_sea=sm.mid_sea if pending else None,
             )
         )
     return TripOutlookOut(trip_id=t.id, today=today, forecast_last_day=last, stops=out, data_status=ds)
