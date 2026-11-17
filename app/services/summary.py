@@ -26,6 +26,7 @@ from app.schemas.summary import (
     ValueAt,
 )
 from app.services.compare import Prefetch, _place_compare, prefetch
+from app.services.sea_calendar import mulddae, sun_times
 
 KST = ZoneInfo("Asia/Seoul")
 _TTL_SECONDS = 600
@@ -130,6 +131,18 @@ def mid_sea_for_day(db: Session, day: date) -> dict[str, MidSeaOut]:
     return out
 
 
+def _calendar(place: Place, day: date, sea: str | None) -> dict:
+    """물때(달력 계산)·일출·일몰. 바다를 모르면 물때는 비우고, 좌표가 없으면 일출·일몰을 비운다"""
+    out: dict = {}
+    if sea:
+        west = sea == "서해"
+        out["mulddae"] = mulddae(day, west)
+        out["mulddae_style"] = "7물때식" if west else "8물때식"
+    if place.lat is not None and place.lon is not None:
+        out["sunrise"], out["sunset"] = sun_times(place.lat, place.lon, day)
+    return out
+
+
 def _mid_for(seas: list[str], mid: dict[str, MidSeaOut]) -> MidSeaOut | None:
     """낚시터가 속한 해역(특보 해역 이름) 중 중기해상예보가 있는 첫 해역"""
     return next((mid[s] for s in seas if s in mid), None)
@@ -181,6 +194,7 @@ def summarize_place(
         precipitation_types=_codes(_find(pc.series, "precipitation_type", "forecast"), after),
         index=_index(pc),
         mid_sea=_mid_for(pc.warning.seas, mid),
+        **_calendar(place, day, _sea_group(pc.warning.seas)),
     )
 
 

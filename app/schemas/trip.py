@@ -225,6 +225,11 @@ class StopOutlookOut(BaseModel):
     warning_note: str | None = None
     # 단기예보가 없는 날의 기상청 중기해상예보 (해역 범위, 참고 — 조건 판정에 쓰지 않음)
     mid_sea: MidSeaOut | None = None
+    # 물때(달력 계산)·일출·일몰 — 예보가 아니라 계산값이라 먼 날짜에도 있다
+    mulddae: str | None = None
+    mulddae_style: str | None = None
+    sunrise: str | None = None
+    sunset: str | None = None
 
 
 class TripOutlookOut(BaseModel):

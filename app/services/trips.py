@@ -525,6 +525,10 @@ def outlook(db: Session, user: AppUser, trip_id: int) -> TripOutlookOut:
                 warning_is_current=s.day == today,
                 tides=sm.tides,
                 mid_sea=sm.mid_sea if pending else None,
+                mulddae=sm.mulddae,
+                mulddae_style=sm.mulddae_style,
+                sunrise=sm.sunrise,
+                sunset=sm.sunset,
             )
         )
     return TripOutlookOut(trip_id=t.id, today=today, forecast_last_day=last, stops=out, data_status=ds)

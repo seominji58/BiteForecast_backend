@@ -55,6 +55,12 @@ class PlaceSummaryOut(BaseModel):
     tides: list[TideEventOut] = Field(default_factory=list, exclude=True)
     # 기상청 중기해상예보 (4~10일 뒤, 해역 단위 파고 범위). 단기예보가 없는 날의 참고 — 조건 판정에 쓰지 않는다
     mid_sea: "MidSeaOut | None" = None
+    # 물때(몇 물): 음력 달력 계산 (서해 7물때식, 남해·동해·제주 8물때식). 바다를 모르면 None
+    mulddae: str | None = None
+    mulddae_style: Literal["7물때식", "8물때식"] | None = None
+    # 일출·일몰 (KST HH:MM, 낚시터 좌표로 계산)
+    sunrise: str | None = None
+    sunset: str | None = None
 
 
 class MidSeaPeriodOut(BaseModel):
