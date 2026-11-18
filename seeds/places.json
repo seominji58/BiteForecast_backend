@@ -1,5 +1,5 @@
 {
- "_note": "지원 장소. 출처: 전국낚시터정보표준데이터(바다·좌표 있음), 국립해양조사원 바다낚시지수 지점, 수동 지정. 좌표는 각 출처 값 그대로이며 정확한 낚시 지점을 보증하지 않는다. scripts/build_places.py 로 생성.",
+ "_note": "지원 장소. 출처: 전국낚시터정보표준데이터(바다·좌표 있음), 국립해양조사원 바다낚시지수 지점, 수동 지정. 좌표는 각 출처 값 그대로이며 정확한 낚시 지점을 보증하지 않는다. scripts/build_places.py 로 생성. + 한국관광공사 관광정보(TourAPI) 바다낚시 장소(2026-11-19 승인 18곳, scripts/add_tour_places.py).",
  "regions": [
   {
    "name": "강원 강릉시",
@@ -112,6 +112,47 @@
      "lon": 128.7895,
      "info": {
       "source": "국립해양조사원 바다낚시지수 지점"
+     }
+    },
+    {
+     "name": "수산항 낚시터",
+     "type": "wharf",
+     "lat": 38.080289,
+     "lon": 128.673366,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "강원특별자치도 양양군 손양면 수산1길 26-41",
+      "phone": null,
+      "data_date": "20260819"
+     }
+    },
+    {
+     "name": "인구항 배낚시",
+     "type": "wharf",
+     "lat": 37.970523,
+     "lon": 128.7636,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "강원특별자치도 양양군 현남면 인구리 1-104",
+      "phone": null,
+      "data_date": "20260819"
+     }
+    }
+   ]
+  },
+  {
+   "name": "경기 김포시",
+   "places": [
+    {
+     "name": "드림바다실내낚시터",
+     "type": "paid",
+     "lat": 37.597618,
+     "lon": 126.720083,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "경기도 김포시 풍무로9번길 26 (풍무동)",
+      "phone": null,
+      "data_date": "20250508"
      }
     }
    ]
@@ -439,6 +480,18 @@
       "manager": "경상남도 거제시청",
       "data_date": "2026-05-22"
      }
+    },
+    {
+     "name": "지세포 낚시공원",
+     "type": "paid",
+     "lat": 34.835655,
+     "lon": 128.716727,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "경상남도 거제시 일운면 지세포리 275-2",
+      "phone": null,
+      "data_date": "20251121"
+     }
     }
    ]
   },
@@ -491,6 +544,18 @@
       "facility": "부유형",
       "manager": "설리어촌계",
       "data_date": "2026-05-22"
+     }
+    },
+    {
+     "name": "장포리 바다낚시",
+     "type": "paid",
+     "lat": 34.8454,
+     "lon": 128.0672,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "경상남도 남해군 창선면 흥선로1505번길 7-84",
+      "phone": null,
+      "data_date": "20261103"
      }
     }
    ]
@@ -1517,6 +1582,93 @@
    ]
   },
   {
+   "name": "인천 강화군",
+   "places": [
+    {
+     "name": "선두바다낚시터",
+     "type": "paid",
+     "lat": 37.599992,
+     "lon": 126.492093,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 강화군 길상면 해안남로 673-15",
+      "phone": null,
+      "data_date": "20261007"
+     }
+    },
+    {
+     "name": "강화도 황청낚시터",
+     "type": "paid",
+     "lat": 37.714139,
+     "lon": 126.364692,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 강화군 내가면 황청포구로443번길 82",
+      "phone": null,
+      "data_date": "20261007"
+     }
+    },
+    {
+     "name": "동검레저바다낚시",
+     "type": "paid",
+     "lat": 37.58622,
+     "lon": 126.520607,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 강화군 길상면 동검길65번길 93-6",
+      "phone": null,
+      "data_date": "20260211"
+     }
+    },
+    {
+     "name": "황산초지바다낚시터",
+     "type": "paid",
+     "lat": 37.620202,
+     "lon": 126.53521,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 강화군 길상면 초지리 1325-60",
+      "phone": null,
+      "data_date": "20260312"
+     }
+    }
+   ]
+  },
+  {
+   "name": "인천 검단구",
+   "places": [
+    {
+     "name": "인천락실내바다낚시터",
+     "type": "paid",
+     "lat": 37.580627,
+     "lon": 126.658552,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 검단구 한서로 36-10 (백석동)",
+      "phone": null,
+      "data_date": "20260814"
+     }
+    }
+   ]
+  },
+  {
+   "name": "인천 남동구",
+   "places": [
+    {
+     "name": "소래바다낚시터",
+     "type": "paid",
+     "lat": 37.406902,
+     "lon": 126.740459,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 남동구 소래로154번길 25-40",
+      "phone": null,
+      "data_date": "20261007"
+     }
+    }
+   ]
+  },
+  {
    "name": "인천 영종구",
    "places": [
     {
@@ -1549,6 +1701,64 @@
       "facility": null,
       "manager": "인천광역시 영종구청",
       "data_date": "2020-09-10"
+     }
+    }
+   ]
+  },
+  {
+   "name": "인천 옹진군",
+   "places": [
+    {
+     "name": "선재낚시공원",
+     "type": "paid",
+     "lat": 37.254269,
+     "lon": 126.522013,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 옹진군 영흥면 선재로226번길 164",
+      "phone": null,
+      "data_date": "20251117"
+     }
+    },
+    {
+     "name": "영흥바다낚시터",
+     "type": "paid",
+     "lat": 37.260806,
+     "lon": 126.492235,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 옹진군 영흥면 영흥로176번길 21",
+      "phone": null,
+      "data_date": "20251107"
+     }
+    },
+    {
+     "name": "용담바다낚시터",
+     "type": "paid",
+     "lat": 37.241553,
+     "lon": 126.47526,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 옹진군 영흥면 영흥남로9번길 311 (외리 21)",
+      "phone": null,
+      "data_date": "20261007"
+     }
+    }
+   ]
+  },
+  {
+   "name": "인천 제물포구",
+   "places": [
+    {
+     "name": "갈매기배낚시",
+     "type": "wharf",
+     "lat": 37.487688,
+     "lon": 126.622992,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "인천광역시 제물포구 보세로 6-1",
+      "phone": null,
+      "data_date": "20260630"
      }
     }
    ]
@@ -1676,6 +1886,23 @@
       "facility": "부유형",
       "manager": "전남광주통합특별시 무안군청",
       "data_date": "2026-05-21"
+     }
+    }
+   ]
+  },
+  {
+   "name": "전남 보성군",
+   "places": [
+    {
+     "name": "득량만바다낚시공원",
+     "type": "paid",
+     "lat": 34.694914,
+     "lon": 127.188014,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "전남광주통합특별시 보성군 득량면 선소당산길 36-13",
+      "phone": null,
+      "data_date": "20261014"
      }
     }
    ]
@@ -2089,6 +2316,18 @@
       "facility": "가두리낚시터",
       "manager": "제주특별자치도 제주시청",
       "data_date": "2023-12-22"
+     }
+    },
+    {
+     "name": "차귀도 바다낚시",
+     "type": "wharf",
+     "lat": 33.301049,
+     "lon": 126.205354,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "제주특별자치도 제주시 한경면 고산리 125-1",
+      "phone": null,
+      "data_date": "20261104"
      }
     }
    ]
@@ -3285,6 +3524,18 @@
       "facility": "부유형",
       "manager": "충청남도 태안군",
       "data_date": "2025-11-14"
+     }
+    },
+    {
+     "name": "안면도 라암도 해상낚시공원",
+     "type": "paid",
+     "lat": 36.491,
+     "lon": 126.4097,
+     "info": {
+      "source": "한국관광공사 관광정보(TourAPI)",
+      "address": "충청남도 태안군 안면읍 중장리 318-53",
+      "phone": null,
+      "data_date": "20260401"
      }
     }
    ]
