@@ -1,0 +1,261 @@
+{
+ "_note": "한국관광공사 TourAPI(KorService2) 낚시 장소 사진 매칭. scripts/match_tour_photos.py 로 생성 — 직접 고치지 말 것",
+ "source": "한국관광공사",
+ "generated_at": "2026-11-18T03:59:18+00:00",
+ "places": {
+  "23": {
+   "contentid": "2782505",
+   "title": "대부도바다낚시터",
+   "dist_m": 51,
+   "name_sim": 1.0,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/46/2785946_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/46/2785946_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/38/2785938_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/38/2785938_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/37/2785937_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/37/2785937_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/45/2785945_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/45/2785945_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/40/2785940_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/40/2785940_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/43/2785943_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/43/2785943_image2_1.jpg"
+    }
+   ]
+  },
+  "24": {
+   "contentid": "2762709",
+   "title": "어심바다낚시터",
+   "dist_m": 40,
+   "name_sim": 1.0,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/95/2773395_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/95/2773395_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/97/2773397_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/97/2773397_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/98/2773398_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/98/2773398_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/99/2773399_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/99/2773399_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/96/2773396_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/96/2773396_image2_1.jpeg"
+    }
+   ]
+  },
+  "29": {
+   "contentid": "2761194",
+   "title": "하늘바다낚시터",
+   "dist_m": 157,
+   "name_sim": 1.0,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/82/4067482_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/82/4067482_image3_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/80/4067480_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/80/4067480_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/84/4067484_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/84/4067484_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/81/4067481_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/81/4067481_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/83/4067483_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/83/4067483_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/79/4067479_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/79/4067479_image2_1.jpg"
+    }
+   ]
+  },
+  "36": {
+   "contentid": "2747381",
+   "title": "서신바다낚시터",
+   "dist_m": 231,
+   "name_sim": 0.67,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/59/2747359_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/59/2747359_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/67/2747367_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/67/2747367_image2_1.jpg"
+    }
+   ]
+  },
+  "49": {
+   "contentid": "2623674",
+   "title": "황금빛노을바다낚시터",
+   "dist_m": 431,
+   "name_sim": 1.0,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/67/2623667_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/67/2623667_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/68/2623668_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/68/2623668_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/72/2623672_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/72/2623672_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/62/2603362_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/62/2603362_image2_1.jpg"
+    }
+   ]
+  },
+  "91": {
+   "contentid": "4138998",
+   "title": "통영등대낚시공원",
+   "dist_m": 9,
+   "name_sim": 1.0,
+   "license": "Type1",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource_photo/66/3567266_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource_photo/66/3567266_image3_1.jpg"
+    }
+   ]
+  },
+  "114": {
+   "contentid": "2754753",
+   "title": "정성레저낚시터",
+   "dist_m": 11,
+   "name_sim": 0.89,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/67/2790267_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/67/2790267_image2_1.jpg"
+    }
+   ]
+  },
+  "117": {
+   "contentid": "2752162",
+   "title": "거금해양낚시공원",
+   "dist_m": 5,
+   "name_sim": 1.0,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/92/2752192_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/92/2752192_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/89/2752189_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/89/2752189_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/90/2752190_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/90/2752190_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/87/2752187_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/87/2752187_image2_1.jpeg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/85/2752185_image2_1.jpeg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/85/2752185_image2_1.jpeg"
+    }
+   ]
+  },
+  "138": {
+   "contentid": "1984255",
+   "title": "정남진해양낚시공원",
+   "dist_m": 3,
+   "name_sim": 1.0,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/29/2661629_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/29/2661629_image3_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/23/2661623_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/23/2661623_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/30/2661630_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/30/2661630_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/25/2661625_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/25/2661625_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/22/2661622_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/22/2661622_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/28/2661628_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/28/2661628_image2_1.jpg"
+    }
+   ]
+  },
+  "213": {
+   "contentid": "3034203",
+   "title": "의항리 해상낚시공원",
+   "dist_m": 1104,
+   "name_sim": 0.75,
+   "license": "공공누리 제3유형 (출처 표시·변경 금지)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/84/3034184_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/84/3034184_image3_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/85/3034185_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/85/3034185_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/86/3034186_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/86/3034186_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/87/3034187_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/87/3034187_image2_1.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/88/3034188_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/88/3034188_image2_1.jpg"
+    }
+   ]
+  }
+ }
+}
