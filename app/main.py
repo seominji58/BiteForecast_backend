@@ -19,6 +19,7 @@ from app.routers import (
     me,
     nearby,
     photos,
+    place_map,
     places,
     trips,
 )
@@ -98,4 +99,5 @@ app.include_router(photos.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
 app.include_router(geo.router, prefix=API_PREFIX)
 app.include_router(nearby.router, prefix=API_PREFIX)
+app.include_router(place_map.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
