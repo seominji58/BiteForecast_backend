@@ -174,19 +174,33 @@ _RETRY_SECONDS = 600
 _lunar_cache: dict[date, int | None] = {}
 
 
+_client = None
+_client_lock = __import__("threading").Lock()
+
+
+def _http():
+    """KASI 호출용 클라이언트 하나를 같이 쓴다 (호출마다 새로 만들면 작은 서버에서 CPU·메모리를 먹는다)"""
+    global _client
+    with _client_lock:
+        if _client is None:
+            import httpx
+
+            _client = httpx.Client(
+                timeout=5, limits=httpx.Limits(max_connections=4, max_keepalive_connections=4)
+            )
+        return _client
+
+
 def _kasi_item(path: str, params: dict) -> dict | None:
     from app.core.config import get_settings
 
     s = get_settings()
     if s.app_env == "test" or not s.data_go_kr_api_key:
         return None
-    import httpx
-
     try:
-        r = httpx.get(
+        r = _http().get(
             f"{_KASI_BASE}/{path}",
             params={"serviceKey": s.data_go_kr_api_key, "_type": "json", **params},
-            timeout=5,
         )
         r.raise_for_status()
         item = r.json()["response"]["body"]["items"]["item"]
@@ -215,12 +229,14 @@ def _fetch_sun(lat: float, lon: float, day: date) -> tuple[str | None, str | Non
     return (rise, sset) if rise and sset else None
 
 
-def prefetch_sun(points: list[tuple[float, float]], day: date, workers: int = 16) -> int:
+def prefetch_sun(points: list[tuple[float, float]], day: date, workers: int = 4) -> int:
     """여러 낚시터 좌표의 공식 일출·일몰을 한꺼번에 받아 둔다 (없는 것만, 동시에). 새로 받은 개수"""
     import time
     from concurrent.futures import ThreadPoolExecutor
 
-    for k in [k for k in _sun_cache if k[2] < day - timedelta(days=2)]:
+    # 지난 날짜만 지운다 (미래 날짜를 받을 때 오늘 것을 지우지 않게 — 기준은 요청 날짜가 아니라 오늘)
+    today = datetime.now(KST).date()
+    for k in [k for k in _sun_cache if k[2] < today - timedelta(days=1)]:
         _sun_cache.pop(k, None)
     now = time.monotonic()
     keys = {(*_cell(a, b), day) for a, b in points}
@@ -239,26 +255,41 @@ def prefetch_sun(points: list[tuple[float, float]], day: date, workers: int = 16
     return got
 
 
-_bg_running: set[date] = set()
+_bg_lock = __import__("threading").Lock()
+_bg_queue: dict[date, tuple[list[tuple[float, float]], object]] = {}
+_bg_thread = None
 
 
 def prefetch_sun_background(points: list[tuple[float, float]], day: date, on_done) -> None:
-    """전체 요약용: 응답을 기다리게 하지 않고 뒤에서 받는다.
-    새로 받은 게 있으면 on_done() (요약 캐시 비우기)"""
+    """전체 요약용: 응답을 기다리게 하지 않고 뒤에서 받는다. 새로 받은 게 있으면 on_done() (요약 캐시 비우기)
+    작은 서버를 지키려고 뒤에서 받는 일꾼은 하나뿐이고, 날짜는 차례로 처리한다 (2026-11-19 서버 멈춤 수정)"""
     import threading
 
-    if day in _bg_running:
-        return
-    _bg_running.add(day)
+    global _bg_thread
+    with _bg_lock:
+        _bg_queue.setdefault(day, (points, on_done))
+        if _bg_thread is not None and _bg_thread.is_alive():
+            return
 
-    def run():
-        try:
-            if prefetch_sun(points, day):
-                on_done()
-        finally:
-            _bg_running.discard(day)
+        def run():
+            while True:
+                global _bg_thread
+                with _bg_lock:
+                    if not _bg_queue:
+                        _bg_thread = None  # 끝나기 직전에 들어온 날짜는 새 일꾼이 맡는다
+                        return
+                    d, (pts, done) = next(iter(_bg_queue.items()))
+                try:
+                    if prefetch_sun(pts, d):
+                        done()
+                except Exception:  # noqa: BLE001
+                    pass
+                finally:
+                    with _bg_lock:
+                        _bg_queue.pop(d, None)
 
-    threading.Thread(target=run, daemon=True).start()
+        _bg_thread = threading.Thread(target=run, daemon=True)
+        _bg_thread.start()
 
 
 def official_sun_times(
