@@ -130,7 +130,7 @@ def main() -> None:
         warn = None
         if dz and dz[0] <= DANGER_M:
             a = dz[1]
-            warn = f"{a[4]} ({a[5]}) · {'안' if dz[0] == 0 else f'{round(dz[0])}m 근처'}"
+            warn = f"{a[3]} · {a[4]} ({a[5]}) · {'안' if dz[0] == 0 else f'{round(dz[0])}m 근처'}"
         points.append(
             {
                 "id": int(r["공간정보일련번호"]),
