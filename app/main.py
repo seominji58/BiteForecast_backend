@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core import logsafe
@@ -23,6 +24,7 @@ from app.routers import (
     place_map,
     place_photos,
     places,
+    rock_points,
     trips,
 )
 
@@ -47,6 +49,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="입질예보 API", version="0.1.0", lifespan=lifespan)
+# 큰 JSON(전체 요약·참고 포인트 1,070곳)을 휴대폰 데이터로 받을 때 크기를 줄인다 (2026-11-19)
+app.add_middleware(GZipMiddleware, minimum_size=2048)
 
 if get_settings().app_env == "dev":
     # 네이티브 앱은 CORS 와 무관. Expo 웹 미리보기용으로 개발 환경에서만 허용
@@ -104,4 +108,5 @@ app.include_router(nearby.router, prefix=API_PREFIX)
 app.include_router(place_map.router, prefix=API_PREFIX)
 app.include_router(place_photos.router, prefix=API_PREFIX)
 app.include_router(place_kakao.router, prefix=API_PREFIX)
+app.include_router(rock_points.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
