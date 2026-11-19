@@ -42,9 +42,12 @@ def main() -> None:
             "languageCode": "ko",
             "regionCode": "KR",
             "pageSize": 5,
-            "locationBias": {"circle": {"center": {"latitude": p["lat"], "longitude": p["lon"]}, "radius": 3000}},
+            "locationBias": {
+                "circle": {"center": {"latitude": p["lat"], "longitude": p["lon"]}, "radius": 3000}
+            },
         }
-        r = httpx.post(SEARCH, json=body, headers={"X-Goog-Api-Key": key, "X-Goog-FieldMask": FIELDS}, timeout=20)
+        headers = {"X-Goog-Api-Key": key, "X-Goog-FieldMask": FIELDS}
+        r = httpx.post(SEARCH, json=body, headers=headers, timeout=20)
         if r.status_code != 200:
             sys.exit(f"구글 오류 {r.status_code}: {r.text[:300]}")
         best = None
