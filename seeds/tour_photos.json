@@ -1,12 +1,12 @@
 {
  "_note": "한국관광공사 TourAPI(KorService2) 낚시 장소 사진 매칭. scripts/match_tour_photos.py 로 생성 — 직접 고치지 말 것",
  "source": "한국관광공사",
- "generated_at": "2026-11-18T23:52:45+00:00",
+ "generated_at": "2026-11-19T00:19:55+00:00",
  "places": {
   "232": {
    "contentid": "2702446",
    "title": "수산항 낚시터",
-   "dist_m": 0,
+   "dist_m": 344,
    "name_sim": 1.0,
    "license": "공공누리 제3유형 (출처 표시·변경 금지)",
    "images": [
@@ -271,7 +271,7 @@
   "49": {
    "contentid": "2623674",
    "title": "황금빛노을바다낚시터",
-   "dist_m": 431,
+   "dist_m": 23,
    "name_sim": 1.0,
    "license": "공공누리 제3유형 (출처 표시·변경 금지)",
    "images": [
@@ -296,7 +296,7 @@
   "91": {
    "contentid": "4138998",
    "title": "통영등대낚시공원",
-   "dist_m": 9,
+   "dist_m": 802,
    "name_sim": 1.0,
    "license": "Type1",
    "images": [
@@ -638,7 +638,7 @@
    "images": [
     {
      "url": "https://tong.visitkorea.or.kr/cms/resource/29/2661629_image2_1.jpg",
-     "thumb": "https://tong.visitkorea.or.kr/cms/resource/29/2661629_image2_1.jpg"
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/29/2661629_image3_1.jpg"
     },
     {
      "url": "https://tong.visitkorea.or.kr/cms/resource/23/2661623_image2_1.jpg",
@@ -750,6 +750,202 @@
     {
      "url": "https://tong.visitkorea.or.kr/cms/resource/88/3034188_image2_1.jpg",
      "thumb": "https://tong.visitkorea.or.kr/cms/resource/88/3034188_image2_1.jpg"
+    }
+   ]
+  },
+  "20": {
+   "contentid": "2550839",
+   "title": "대포항",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 한국관광공사 이범수 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/39/2550839.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/39/2550839.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/42/2550842.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/42/2550842.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/44/2550844.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/44/2550844.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/45/2550845.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/45/2550845.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/46/2550846.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/46/2550846.jpg"
+    }
+   ]
+  },
+  "19": {
+   "contentid": "2028786",
+   "title": "동명항",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 한국관광공사 이범수 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/86/2028786.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/86/2028786.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/88/2028788.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/88/2028788.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/89/2028789.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/89/2028789.jpg"
+    }
+   ]
+  },
+  "22": {
+   "contentid": "1187852",
+   "title": "남애항",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 한국관광공사 김지호 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/52/1187852.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/52/1187852.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/00/1187900.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/00/1187900.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/14/1187914.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/14/1187914.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/81/1187981.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/81/1187981.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/93/1187993.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/93/1187993.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/45/1749045.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/45/1749045.jpg"
+    }
+   ]
+  },
+  "77": {
+   "contentid": "1960874",
+   "title": "욕지도",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 이호인 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/74/1960874.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/74/1960874.jpg"
+    }
+   ]
+  },
+  "106": {
+   "contentid": "2927155",
+   "title": "청사포",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 부산관광공사 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/55/2927155.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/55/2927155.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/58/2927158.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/58/2927158.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/61/2927161.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/61/2927161.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/63/2927163.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/63/2927163.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/66/2927166.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/66/2927166.jpg"
+    }
+   ]
+  },
+  "131": {
+   "contentid": "1915004",
+   "title": "거문도",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 한국관광공사 김지호 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/04/1915004.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/04/1915004.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/06/1915006.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/06/1915006.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/08/1915008.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/08/1915008.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/11/1915011.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/11/1915011.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/12/1915012.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/12/1915012.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/13/1915013.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/13/1915013.jpg"
+    }
+   ]
+  },
+  "149": {
+   "contentid": "1845751",
+   "title": "비양도",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 한구관광공사 김지호 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/51/1845751.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/51/1845751.jpg"
+    }
+   ]
+  },
+  "174": {
+   "contentid": "1194057",
+   "title": "오천항",
+   "kind": "gallery",
+   "license": "관광사진 갤러리 · 촬영 한국관광공사 김지호 (출처 표시)",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/57/1194057.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/57/1194057.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/68/1194068.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/68/1194068.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/07/1194107.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/07/1194107.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/13/1194113.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/13/1194113.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/23/1194123.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/23/1194123.jpg"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms2/website/38/1194138.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms2/website/38/1194138.jpg"
     }
    ]
   }
