@@ -30,8 +30,12 @@ def _new_moon_jde(k: int) -> float:
     jde = 2451550.09766 + 29.530588861 * k + 0.00015437 * t**2 - 0.000000150 * t**3 + 0.00000000073 * t**4
     e = 1 - 0.002516 * t - 0.0000074 * t**2
     m = math.radians((2.5534 + 29.10535670 * k - 0.0000014 * t**2 - 0.00000011 * t**3) % 360)
-    mp = math.radians((201.5643 + 385.81693528 * k + 0.0107582 * t**2 + 0.00001238 * t**3 - 0.000000058 * t**4) % 360)
-    f = math.radians((160.7108 + 390.67050284 * k - 0.0016118 * t**2 - 0.00000227 * t**3 + 0.000000011 * t**4) % 360)
+    mp = math.radians(
+        (201.5643 + 385.81693528 * k + 0.0107582 * t**2 + 0.00001238 * t**3 - 0.000000058 * t**4) % 360
+    )
+    f = math.radians(
+        (160.7108 + 390.67050284 * k - 0.0016118 * t**2 - 0.00000227 * t**3 + 0.000000011 * t**4) % 360
+    )
     om = math.radians((124.7746 - 1.56375588 * k + 0.0020672 * t**2 + 0.00000215 * t**3) % 360)
     corr = (
         -0.40720 * math.sin(mp)
@@ -77,7 +81,22 @@ def _new_moon_jde(k: int) -> float:
         239.56 + 25.513099 * k,
         331.55 + 3.592518 * k,
     ]
-    coef = [0.000325, 0.000165, 0.000164, 0.000126, 0.000110, 0.000062, 0.000060, 0.000056, 0.000047, 0.000042, 0.000040, 0.000037, 0.000035, 0.000023]
+    coef = [
+        0.000325,
+        0.000165,
+        0.000164,
+        0.000126,
+        0.000110,
+        0.000062,
+        0.000060,
+        0.000056,
+        0.000047,
+        0.000042,
+        0.000040,
+        0.000037,
+        0.000035,
+        0.000023,
+    ]
     corr += sum(c * math.sin(math.radians(x % 360)) for c, x in zip(coef, a, strict=True))
     return jde + corr
 
@@ -85,7 +104,9 @@ def _new_moon_jde(k: int) -> float:
 def lunar_day(day: date) -> int:
     """음력 날짜(1~30): 한국 시간으로 그날 이전(그날 포함) 마지막 합삭이 든 날이 1일"""
     noon = datetime(day.year, day.month, day.day, 12, tzinfo=KST)
-    k = math.floor((noon - datetime(2000, 1, 6, 18, 14, tzinfo=timezone.utc)).total_seconds() / 86400 / _SYNODIC)
+    k = math.floor(
+        (noon - datetime(2000, 1, 6, 18, 14, tzinfo=timezone.utc)).total_seconds() / 86400 / _SYNODIC
+    )
     for kk in (k + 1, k, k - 1, k - 2):
         nm = _jde_to_datetime(_new_moon_jde(kk)).astimezone(KST).date()
         if nm <= day:
@@ -93,14 +114,19 @@ def lunar_day(day: date) -> int:
     raise ValueError("합삭을 찾지 못했어요")
 
 
-def mulddae(day: date, west: bool) -> str:
-    """물때 이름. west=True 면 서해 7물때식, 아니면 8물때식(남해·동해·제주)"""
-    i = (lunar_day(day) - 1) % 15  # 1·16일 = 0
+def mulddae_name(lday: int, west: bool) -> str:
+    """음력 날짜 → 물때 이름. west=True 면 서해 7물때식, 아니면 8물때식(남해·동해·제주)"""
+    i = (lday - 1) % 15  # 1·16일 = 0
     if i == 7:
         return "조금"
     if west:
         return f"{i + 7}물" if i < 7 else "무시" if i == 8 else f"{i - 8}물"
     return f"{i + 8}물" if i < 7 else f"{i - 7}물"
+
+
+def mulddae(day: date, west: bool) -> str:
+    """물때 이름 (음력은 합삭 계산)"""
+    return mulddae_name(lunar_day(day), west)
 
 
 def sun_times(lat: float, lon: float, day: date) -> tuple[str | None, str | None]:
@@ -131,3 +157,140 @@ def sun_times(lat: float, lon: float, day: date) -> tuple[str | None, str | None
         return f"{hh:02d}:{mm:02d}"
 
     return calc(True), calc(False)
+
+
+# ── 한국천문연구원 공식 자료 (2026-11-19) ─────────────────────────────────────
+# 일출·일몰: 출몰시각 정보(RiseSetInfoService)
+#   좌표 0.1° 격자(약 10km, 일출 차이 1분 미만)·날짜별로 한 번 받아 둔다
+# 음력 날짜: 음양력 정보(LrsrCldInfoService) — 날짜별 한 번. 물때 규칙(7·8물때식)은 그대로
+# 받지 못하면(키 미승인·장애) 위의 계산식으로 대신하고, 어느 쪽인지 출처로 알린다
+KASI = "한국천문연구원"
+CALC = "계산"
+_KASI_BASE = "http://apis.data.go.kr/B090041/openapi/service"
+_sun_cache: dict[tuple[float, float, date], tuple[str | None, str | None]] = {}
+# 받지 못한 좌표·날짜 → 그 시각 (장애 때 같은 곳을 계속 다시 부르지 않게 10분 쉼)
+_sun_fail: dict[tuple[float, float, date], float] = {}
+_RETRY_SECONDS = 600
+_lunar_cache: dict[date, int | None] = {}
+
+
+def _kasi_item(path: str, params: dict) -> dict | None:
+    from app.core.config import get_settings
+
+    s = get_settings()
+    if s.app_env == "test" or not s.data_go_kr_api_key:
+        return None
+    import httpx
+
+    try:
+        r = httpx.get(
+            f"{_KASI_BASE}/{path}",
+            params={"serviceKey": s.data_go_kr_api_key, "_type": "json", **params},
+            timeout=5,
+        )
+        r.raise_for_status()
+        item = r.json()["response"]["body"]["items"]["item"]
+        return item[0] if isinstance(item, list) else item
+    except Exception:  # noqa: BLE001 — 외부 자료가 안 오면 계산식으로
+        return None
+
+
+def _hhmm(v) -> str | None:
+    v = str(v or "").strip()
+    return f"{v[:2]}:{v[2:4]}" if len(v) >= 4 and v[:4].isdigit() else None
+
+
+def _cell(lat: float, lon: float) -> tuple[float, float]:
+    return round(lat, 1), round(lon, 1)
+
+
+def _fetch_sun(lat: float, lon: float, day: date) -> tuple[str | None, str | None] | None:
+    item = _kasi_item(
+        "RiseSetInfoService/getLCRiseSetInfo",
+        {"longitude": lon, "latitude": lat, "locdate": day.strftime("%Y%m%d"), "dnYn": "Y"},
+    )
+    if not item:
+        return None
+    rise, sset = _hhmm(item.get("sunrise")), _hhmm(item.get("sunset"))
+    return (rise, sset) if rise and sset else None
+
+
+def prefetch_sun(points: list[tuple[float, float]], day: date, workers: int = 16) -> int:
+    """여러 낚시터 좌표의 공식 일출·일몰을 한꺼번에 받아 둔다 (없는 것만, 동시에). 새로 받은 개수"""
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    for k in [k for k in _sun_cache if k[2] < day - timedelta(days=2)]:
+        _sun_cache.pop(k, None)
+    now = time.monotonic()
+    keys = {(*_cell(a, b), day) for a, b in points}
+    todo = sorted(k for k in keys if k not in _sun_cache and now - _sun_fail.get(k, -1e9) > _RETRY_SECONDS)
+    if not todo:
+        return 0
+    got = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        for k, v in zip(todo, ex.map(lambda k: _fetch_sun(k[0], k[1], day), todo), strict=True):
+            if v:
+                _sun_cache[k] = v
+                _sun_fail.pop(k, None)
+                got += 1
+            else:
+                _sun_fail[k] = now
+    return got
+
+
+_bg_running: set[date] = set()
+
+
+def prefetch_sun_background(points: list[tuple[float, float]], day: date, on_done) -> None:
+    """전체 요약용: 응답을 기다리게 하지 않고 뒤에서 받는다.
+    새로 받은 게 있으면 on_done() (요약 캐시 비우기)"""
+    import threading
+
+    if day in _bg_running:
+        return
+    _bg_running.add(day)
+
+    def run():
+        try:
+            if prefetch_sun(points, day):
+                on_done()
+        finally:
+            _bg_running.discard(day)
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def official_sun_times(
+    lat: float, lon: float, day: date, fetch: bool = False
+) -> tuple[str | None, str | None, str]:
+    """(일출, 일몰, 출처). fetch=True 면 없을 때 한 곳만 바로 받아 본다 (출조 계획 등 낱개 조회)"""
+    if fetch:
+        prefetch_sun([(lat, lon)], day)
+    c = _cell(lat, lon)
+    hit = _sun_cache.get((c[0], c[1], day))
+    if hit:
+        return hit[0], hit[1], KASI
+    rise, sset = sun_times(lat, lon, day)
+    return rise, sset, CALC
+
+
+def official_lunar_day(day: date) -> tuple[int, str]:
+    """(음력 날짜, 출처). 공식 음양력 자료가 없으면 합삭 계산"""
+    if day not in _lunar_cache:
+        item = _kasi_item(
+            "LrsrCldInfoService/getLunCalInfo",
+            {"solYear": day.year, "solMonth": f"{day.month:02d}", "solDay": f"{day.day:02d}"},
+        )
+        try:
+            _lunar_cache[day] = int(item["lunDay"]) if item else None
+        except (KeyError, TypeError, ValueError):
+            _lunar_cache[day] = None
+    v = _lunar_cache[day]
+    return (v, KASI) if v else (lunar_day(day), CALC)
+
+
+def mulddae_official(day: date, west: bool) -> tuple[str, str]:
+    """(물때, 음력 출처). 물때 규칙은 같고, 음력 날짜만 공식 자료를 쓴다"""
+    lday, src = official_lunar_day(day)
+    return mulddae_name(lday, west), src

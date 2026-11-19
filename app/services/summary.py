@@ -26,7 +26,7 @@ from app.schemas.summary import (
     ValueAt,
 )
 from app.services.compare import Prefetch, _place_compare, prefetch
-from app.services.sea_calendar import mulddae, sun_times
+from app.services.sea_calendar import mulddae_official, official_sun_times, prefetch_sun_background
 
 KST = ZoneInfo("Asia/Seoul")
 _TTL_SECONDS = 600
@@ -62,7 +62,24 @@ def _low(s: SeriesOut | None, after: datetime | None) -> ValueAt | None:
     return ValueAt(v=round(p.v, 1), t=p.t) if p else None
 
 
-DIRS16 = ["북", "북북동", "북동", "동북동", "동", "동남동", "남동", "남남동", "남", "남남서", "남서", "서남서", "서", "서북서", "북서", "북북서"]
+DIRS16 = [
+    "북",
+    "북북동",
+    "북동",
+    "동북동",
+    "동",
+    "동남동",
+    "남동",
+    "남남동",
+    "남",
+    "남남서",
+    "남서",
+    "서남서",
+    "서",
+    "서북서",
+    "북서",
+    "북북서",
+]
 
 
 def deg_to_dir16(deg: float) -> str:
@@ -132,7 +149,9 @@ def mid_sea_for_day(db: Session, day: date) -> dict[str, MidSeaOut]:
     out: dict[str, MidSeaOut] = {}
     order = {"am": 0, "pm": 1, "day": 2}
     for region, tm in latest.items():
-        ps = sorted((r for r in rows if r.region == region and r.tm_fc == tm), key=lambda r: order.get(r.period, 9))
+        ps = sorted(
+            (r for r in rows if r.region == region and r.tm_fc == tm), key=lambda r: order.get(r.period, 9)
+        )
         mins = [r.wave_min for r in ps if r.wave_min is not None]
         maxs = [r.wave_max for r in ps if r.wave_max is not None]
         out[region] = MidSeaOut(
@@ -140,22 +159,25 @@ def mid_sea_for_day(db: Session, day: date) -> dict[str, MidSeaOut]:
             wave_min=min(mins) if mins else None,
             wave_max=max(maxs) if maxs else None,
             periods=[
-                MidSeaPeriodOut(period=r.period, wave_min=r.wave_min, wave_max=r.wave_max, weather=r.weather) for r in ps
+                MidSeaPeriodOut(period=r.period, wave_min=r.wave_min, wave_max=r.wave_max, weather=r.weather)
+                for r in ps
             ],
             issued_at=tm,
         )
     return out
 
 
-def _calendar(place: Place, day: date, sea: str | None) -> dict:
-    """물때(달력 계산)·일출·일몰. 바다를 모르면 물때는 비우고, 좌표가 없으면 일출·일몰을 비운다"""
+def _calendar(place: Place, day: date, sea: str | None, fetch: bool = False) -> dict:
+    """물때·일출·일몰 (한국천문연구원 자료, 받지 못하면 계산). 바다를 모르면 물때, 좌표가 없으면 일출·일몰을 비운다"""
     out: dict = {}
     if sea:
         west = sea == "서해"
-        out["mulddae"] = mulddae(day, west)
+        out["mulddae"], out["lunar_source"] = mulddae_official(day, west)
         out["mulddae_style"] = "7물때식" if west else "8물때식"
     if place.lat is not None and place.lon is not None:
-        out["sunrise"], out["sunset"] = sun_times(place.lat, place.lon, day)
+        out["sunrise"], out["sunset"], out["sun_source"] = official_sun_times(
+            place.lat, place.lon, day, fetch
+        )
     return out
 
 
@@ -222,7 +244,7 @@ def summarize_place(
         precipitation_types=_codes(_find(pc.series, "precipitation_type", "forecast"), after),
         index=_index(pc),
         mid_sea=_mid_for(pc.warning.seas, mid),
-        **_calendar(place, day, _sea_group(pc.warning.seas)),
+        **_calendar(place, day, _sea_group(pc.warning.seas), fetch=pf is None),  # 낱개 조회만 바로 받기
         zone_notes=_zone_notes(pc.regulation),
     )
 
@@ -243,6 +265,12 @@ def summarize(db: Session, day: date) -> list[PlaceSummaryOut]:
     ).all()
     pf = prefetch(db, list(places), day)  # 전체 장소의 하루 자료를 표마다 한 번씩만 읽는다
     mid = mid_sea_for_day(db, day)  # 해역 8곳이라 하루 한 번만 읽는다
+    # 공식 일출·일몰(한국천문연구원)은 뒤에서 받는다. 받기 전에는 계산값(출처 「계산」), 받으면 이 날 요약을 다시 만든다
+    prefetch_sun_background(
+        [(p.lat, p.lon) for p in places if p.lat is not None and p.lon is not None],
+        day,
+        lambda: _cache.pop(day, None),
+    )
     out = [summarize_place(db, place, day, pf, mid) for place in places]
     _cache[day] = (time.monotonic(), out)
     return out
