@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.db import init_db
 from app.routers import (
     admin,
+    amenities,
     auth,
     community,
     compare,
@@ -121,6 +122,7 @@ def _clean_msg(msg: str) -> str:
 
 
 app.include_router(health.router, prefix=API_PREFIX)
+app.include_router(amenities.router, prefix=API_PREFIX)
 app.include_router(places.router, prefix=API_PREFIX)
 app.include_router(me.router, prefix=API_PREFIX)
 app.include_router(trips.router, prefix=API_PREFIX)
