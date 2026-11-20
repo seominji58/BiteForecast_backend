@@ -24,7 +24,7 @@ from app.services.location import suspect_place_ids
 router = APIRouter(tags=["places"])
 _URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 _TTL = 3600
-_cache: dict[tuple[int, str], tuple[float, list]] = {}
+_cache: dict[tuple[str, str], tuple[float, list]] = {}
 
 Kind = Literal["shop", "boat"]
 # 종류별 검색어 · 반경(m). 낚시배는 항구에서 출항하므로 넓게
@@ -60,8 +60,8 @@ def _keep(kind: str, category: str) -> bool:
     return True
 
 
-def _search(key: str, place: Place, kind: str) -> list[NearbyPlaceOut]:
-    hit = _cache.get((place.id, kind))
+def _search(key: str, cache_key: str, lat: float, lon: float, kind: str) -> list[NearbyPlaceOut]:
+    hit = _cache.get((cache_key, kind))
     if hit and time.monotonic() - hit[0] < _TTL:
         return hit[1]
     query, radius = _QUERY[kind]
@@ -70,8 +70,8 @@ def _search(key: str, place: Place, kind: str) -> list[NearbyPlaceOut]:
             _URL,
             params={
                 "query": query,
-                "x": place.lon,
-                "y": place.lat,
+                "x": lon,
+                "y": lat,
                 "radius": radius,
                 "sort": "distance",
                 "size": 15,
@@ -101,7 +101,7 @@ def _search(key: str, place: Place, kind: str) -> list[NearbyPlaceOut]:
     ][:8]
     if len(_cache) > 1000:
         _cache.clear()
-    _cache[(place.id, kind)] = (time.monotonic(), out)
+    _cache[(cache_key, kind)] = (time.monotonic(), out)
     return out
 
 
@@ -114,7 +114,16 @@ def nearby(place_id: int, db: DbSession):
     if place.lat is None or place.lon is None or place.id in suspect_place_ids(db):
         why = "위치가 확인되지 않은 낚시터라 근처 검색을 하지 않았어요"
         return NearbyOut(shops=[], boats=[], fetched_at=now, skipped=why)
+    return search_around(f"p{place.id}", place.lat, place.lon)
+
+
+def search_around(cache_key: str, lat: float, lon: float) -> NearbyOut:
+    """좌표 주변 낚시점(5km)·낚시배(15km). 낚시터와 갯바위 포인트가 같이 쓴다"""
     key = get_settings().kakao_rest_key
     if not key:
         raise HTTPException(status_code=503, detail="근처 검색을 지금 쓸 수 없어요")
-    return NearbyOut(shops=_search(key, place, "shop"), boats=_search(key, place, "boat"), fetched_at=now)
+    return NearbyOut(
+        shops=_search(key, cache_key, lat, lon, "shop"),
+        boats=_search(key, cache_key, lat, lon, "boat"),
+        fetched_at=datetime.now(UTC),
+    )

@@ -44,6 +44,10 @@ class PlaceOut(ORMModel):
     coord: CoordOut | None = None
     # 낚시터 안내 어종 (전국낚시터정보표준데이터 원문, 예: 「우럭+참돔+농어 등」). 조황이 아니라 업소가 알린 대상 어종
     info_species: str | None = None
+    # 주소 칸이 없는 곳의 좌표 근처 주소 (카카오 좌표→주소).
+    # region 이면 번지 없는 동·리 이름 → 앱에서 「근처」로 표시
+    near_address: str | None = None
+    near_address_kind: Literal["address", "region"] | None = None
 
 
 class PlaceInfoOut(ORMModel):

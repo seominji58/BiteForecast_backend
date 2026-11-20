@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import Place, PlaceCoordCheck, Station
 from app.schemas.place import CoordOut, PlaceOut
+from app.services.near_address import near
 from app.services.warning import sea_keywords
 
 # 같은 시·도의 (좌표가 다른) 가장 가까운 낚시터가 이만큼 넘게 떨어져 있고,
@@ -172,8 +173,17 @@ def place_out(db: Session, place: Place, ctx: LocationCtx | None = None) -> Plac
             "location_suspect": place.id in ctx.suspects,
             "coord": ctx.coords.get(place.id),
             "info_species": (place.info.species or None) if place.info else None,
+            **_near(place),
         }
     )
+
+
+def _near(place: Place) -> dict:
+    """주소 칸이 비었을 때만 좌표 근처 주소를 붙인다"""
+    if place.info and place.info.address:
+        return {}
+    hit = near("place", place.id, place.lat, place.lon)
+    return {"near_address": hit[0], "near_address_kind": hit[1]} if hit else {}
 
 
 @lru_cache(maxsize=4)

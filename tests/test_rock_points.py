@@ -2,6 +2,8 @@
 
 import math
 
+import httpx
+
 from app.routers import rock_points
 from scripts.build_rock_points import catches, utmk_to_wgs84
 
@@ -29,3 +31,38 @@ def test_catches_parse():
         {"species": "감성돔", "methods": ["릴찌", "장대"]},
         {"species": "농어", "methods": ["루어"]},
     ]
+
+
+def test_near_address_attached_and_nearby(client, monkeypatch):
+    """근처 주소가 붙고, 포인트 좌표로 주변 낚시점을 찾는다 (2026-11-20)"""
+    from app.routers import nearby
+
+    rock_points._data.cache_clear()
+    pts = client.get("/api/v1/rock-points").json()["points"]
+    with_addr = [p for p in pts if p.get("near_address")]
+    assert len(with_addr) > 1000
+    assert all(p["near_address_kind"] in ("address", "region") for p in with_addr)
+
+    p = pts[0]
+    seen = {}
+
+    def get(url, params=None, headers=None, timeout=None):
+        seen.update(params)
+        return httpx.Response(200, json={"documents": []}, request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(nearby.get_settings(), "kakao_rest_key", "test")
+    monkeypatch.setattr(nearby.httpx, "get", get)
+    nearby._cache.clear()
+    r = client.get(f"/api/v1/rock-points/{p['id']}/nearby")
+    assert r.status_code == 200 and r.json()["shops"] == []
+    assert seen["x"] == p["lon"] and seen["y"] == p["lat"]
+    assert client.get("/api/v1/rock-points/99999999/nearby").status_code == 404
+
+
+def test_near_requires_matching_coords():
+    from app.services.near_address import near
+
+    rock_points._data.cache_clear()
+    p = rock_points._data()["points"][0]
+    assert near("rock", p["id"], p["lat"], p["lon"]) is not None
+    assert near("rock", p["id"], p["lat"] + 0.01, p["lon"]) is None  # 다른 곳의 같은 id → 붙이지 않음

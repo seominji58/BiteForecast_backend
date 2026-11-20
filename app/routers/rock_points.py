@@ -9,9 +9,13 @@
 import json
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
+
+from app.routers.nearby import NearbyOut, search_around
+from app.services.near_address import near
 
 router = APIRouter(tags=["places"])
 _FILE = Path(__file__).resolve().parent.parent.parent / "seeds" / "rock_points.json"
@@ -34,6 +38,9 @@ class RockPointOut(BaseModel):
     tide: str | None = None
     catches: list[RockCatchOut] = []
     danger: str | None = None
+    # 좌표 근처 주소 (카카오 좌표→주소). region 이면 동·리 이름만 → 앱에서 「근처」
+    near_address: str | None = None
+    near_address_kind: Literal["address", "region"] | None = None
 
 
 class RockPointsOut(BaseModel):
@@ -46,12 +53,26 @@ class RockPointsOut(BaseModel):
 @lru_cache(maxsize=1)
 def _data() -> dict:
     try:
-        return json.loads(_FILE.read_text(encoding="utf-8"))
+        d = json.loads(_FILE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {"source": "", "excluded": "", "notice": "", "points": []}
+    for p in d["points"]:
+        hit = near("rock", p["id"], p["lat"], p["lon"])
+        if hit:
+            p["near_address"], p["near_address_kind"] = hit
+    return d
 
 
 @router.get("/rock-points", response_model=RockPointsOut)
 def rock_points(response: Response):
     response.headers["Cache-Control"] = "public, max-age=86400"
     return _data()
+
+
+@router.get("/rock-points/{point_id}/nearby", response_model=NearbyOut)
+def rock_point_nearby(point_id: int):
+    """갯바위 포인트 주변 낚시점·낚시배 (낚시터와 같은 카카오 반경 검색)"""
+    p = next((p for p in _data()["points"] if p["id"] == point_id), None)
+    if p is None:
+        raise HTTPException(status_code=404, detail="포인트를 찾을 수 없습니다")
+    return search_around(f"r{point_id}", p["lat"], p["lon"])
