@@ -25,12 +25,15 @@ from app.schemas.summary import (
     TideEventOut,
     ValueAt,
 )
+from app.services import warning_refresh
 from app.services.compare import Prefetch, _place_compare, prefetch
 from app.services.sea_calendar import mulddae_official, official_sun_times, prefetch_sun_background
 
 KST = ZoneInfo("Asia/Seoul")
 _TTL_SECONDS = 600
 _cache: dict[date, tuple[float, list[PlaceSummaryOut]]] = {}
+# 특보를 새로 받으면 지도 핀의 ⚠ 가 10분 캐시에 묶이지 않게 바로 비운다
+warning_refresh.on_refreshed(_cache.clear)
 
 _LEVEL_RANK = {"매우좋음": 5, "좋음": 4, "보통": 3, "나쁨": 2, "매우나쁨": 1}
 

@@ -24,6 +24,7 @@ from app.models import MarineWarningSnapshot, Place
 from app.models.base import utcnow
 from app.models.enums import PlaceType
 from app.schemas.compare import WarningMatchOut, WarningOut
+from app.services import warning_refresh
 
 STALE_AFTER = timedelta(hours=3)
 MARINE_TYPES = ("풍랑", "폭풍해일", "태풍", "해일")
@@ -118,7 +119,10 @@ def _aware(t: datetime) -> datetime:
 
 
 def latest_snapshot(db: Session) -> MarineWarningSnapshot | None:
-    return db.scalar(select(MarineWarningSnapshot).order_by(MarineWarningSnapshot.fetched_at.desc()).limit(1))
+    snap = db.scalar(select(MarineWarningSnapshot).order_by(MarineWarningSnapshot.fetched_at.desc()).limit(1))
+    # 15분 넘게 지났으면 뒤에서 새로 받는다 (이번 응답은 기다리지 않음, services/warning_refresh.py)
+    warning_refresh.maybe_refresh(snap.fetched_at if snap else None)
+    return snap
 
 
 _UNSET = object()

@@ -22,7 +22,6 @@ import logging
 import os
 import time
 from collections import Counter
-from dataclasses import asdict
 from datetime import date, timedelta
 
 from sqlalchemy import delete, func, select
@@ -41,7 +40,6 @@ from app.jobs.collector_status import STATUS_PATH, read_status, write_status
 from app.models import (
     FishingIndex,
     Journal,
-    MarineWarningSnapshot,
     MidSeaForecast,
     OceanReading,
     PlaceStation,
@@ -53,6 +51,7 @@ from app.models.base import utcnow
 from app.models.enums import DataKind, Metric, StationRole
 from app.services.envlink import link_environment
 from app.services.freshness import data_status
+from app.services.warning_refresh import store_snapshot
 
 log = logging.getLogger("collect")
 
@@ -412,22 +411,7 @@ def _collect_warnings(db, client, stats: Counter) -> None:
         log.error("특보 현황 수집 실패: %s", e)
         stats["warning_errors"] += 1
         return
-    db.add(
-        MarineWarningSnapshot(
-            issued_at=st.issued_at,
-            fetched_at=utcnow(),
-            active_json=json.dumps([asdict(w) for w in st.active], ensure_ascii=False),
-            preliminary_json=json.dumps([asdict(p) for p in st.preliminary], ensure_ascii=False),
-            raw_active=st.raw_active,
-            raw_preliminary=st.raw_preliminary,
-        )
-    )
-    # 오래된 스냅샷 정리 (최근 48개만 유지)
-    old = db.scalars(
-        select(MarineWarningSnapshot.id).order_by(MarineWarningSnapshot.fetched_at.desc()).offset(48)
-    ).all()
-    if old:
-        db.execute(delete(MarineWarningSnapshot).where(MarineWarningSnapshot.id.in_(old)))
+    store_snapshot(db, st)  # 오래된 스냅샷 정리 포함 (API 서버의 15분 갱신과 같은 함수)
     stats["warning_snapshots"] += 1
 
 
