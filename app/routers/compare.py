@@ -1,4 +1,5 @@
-from datetime import date
+import time
+from datetime import date, timedelta
 
 from fastapi import APIRouter, HTTPException
 
@@ -43,6 +44,30 @@ def fishing_index(date: date, db: DbSession):
     """그날 모든 공식 지수 지점의 어종별·시간대별 등급과 연결 낚시터 (홈 어종 탐색). 발표값 그대로"""
     svc._check_day(date)
     return day_index(db, date)
+
+
+@router.get("/fishing-index/week", response_model=list[FishingIndexDayOut])
+def fishing_index_week(start: date, db: DbSession, days: int = 7):
+    """홈 「언제 갈까」: start 부터 days 일(최대 7) 공식 지수를 한 번에 (요청 7번 → 1번, 2026-11-23).
+    비교 가능 범위 밖 날짜는 뺀다. 5분 메모리 캐시"""
+    out = []
+    for i in range(max(1, min(days, 7))):
+        d = start + timedelta(days=i)
+        try:
+            svc._check_day(d)
+        except HTTPException:
+            continue
+        hit = _week_cache.get(d)
+        if hit and time.monotonic() - hit[0] < 300:
+            out.append(hit[1])
+            continue
+        v = day_index(db, d)
+        _week_cache[d] = (time.monotonic(), v)
+        out.append(v)
+    return out
+
+
+_week_cache: dict = {}
 
 
 @router.get("/meta/data-status", response_model=DataStatusOut)

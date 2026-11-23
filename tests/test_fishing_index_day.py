@@ -77,3 +77,13 @@ def test_day_index_excludes_suspect_places(client, monkeypatch):
     d = client.get(f"/api/v1/fishing-index?date={today_kst()}").json()
     p = next(x for x in d["points"] if x["station_id"] == sid)
     assert [x["place_id"] for x in p["places"]] == [official]
+
+
+def test_week_endpoint(client):
+    """홈 「언제 갈까」: 여러 날을 한 번에, 범위 밖 날짜는 뺀다"""
+    rng = client.get("/api/v1/meta/date-range").json()
+    r = client.get("/api/v1/fishing-index/week", params={"start": rng["today"], "days": 7})
+    assert r.status_code == 200
+    days = [d["date"] for d in r.json()]
+    assert days and days[0] == rng["today"] and all(d <= rng["max"] for d in days)
+    assert len(client.get("/api/v1/fishing-index/week", params={"start": rng["today"], "days": 30}).json()) <= 7
