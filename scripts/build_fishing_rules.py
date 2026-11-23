@@ -252,6 +252,13 @@ APP_SPECIES = {
     "conger": ["붕장어"],
     "greenling": ["쥐노래미"],
     "marbled_flounder": ["문치가자미"],
+    "spanish_mackerel": ["삼치"],
+    "filefish": ["말쥐치"],
+    "mitre_squid": [],
+    "gizzard_shad": ["전어"],
+    "flounder": ["참가자미", "용가자미", "기름가자미"],
+    "croaker": ["민어"],
+    "yellowtail": ["방어"],
 }
 
 # 시행령 제6조 ③항: 연중 포획·채취 금지 암컷

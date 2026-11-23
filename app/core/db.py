@@ -87,6 +87,13 @@ DEFAULT_SPECIES = [
     ("bigfin_squid", "무늬오징어"),
     ("marbled_flounder", "도다리(문치가자미)"),  # 0006
     ("red_drum", "점성어"),  # 0006
+    ("spanish_mackerel", "삼치"),  # 0009
+    ("yellowtail", "방어"),  # 0009
+    ("filefish", "쥐치"),  # 0009
+    ("mitre_squid", "한치"),  # 0009
+    ("gizzard_shad", "전어"),  # 0009
+    ("flounder", "가자미"),  # 0009
+    ("croaker", "민어"),  # 0009
 ]
 
 
