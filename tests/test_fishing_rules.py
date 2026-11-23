@@ -1,0 +1,33 @@
+"""금어기·금지체장 (시행령 별표1·2 요약)"""
+
+import re
+
+from app.routers import fishing_rules
+
+MMDD = re.compile(r"^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
+
+
+def test_endpoint_shape(client):
+    fishing_rules._data.cache_clear()
+    r = client.get("/api/v1/meta/fishing-rules")
+    assert r.status_code == 200 and "max-age" in r.headers["cache-control"]
+    d = r.json()
+    assert "별표1" in d["source"] and "2026.6.23" in d["source"]
+    assert len(d["ban"]) == 33 and len(d["size"]) == 34
+    for b in d["ban"]:
+        assert b["periods"], b["name"]
+        for p in b["periods"]:
+            assert MMDD.match(p["from"]) and MMDD.match(p["to"]), b
+    names = {b["name"] for b in d["ban"]} | {s["name"] for s in d["size"]}
+    for code, law in d["app_species"].items():
+        assert set(law) <= names, code  # 앱 어종이 가리키는 법령 이름이 실제로 있다
+
+
+def test_known_values():
+    d = fishing_rules._data()
+    ban = {b["name"]: b for b in d["ban"]}
+    size = {s["name"]: s for s in d["size"]}
+    assert ban["감성돔"]["periods"][0] == {"from": "05-01", "to": "05-31", "region": None}
+    assert ban["문치가자미"]["periods"][0]["from"] == "12-01"  # 해를 넘김
+    assert ban["고등어"]["notice"] and ban["꽃게"]["notice"]  # 고시로 정하는 기간
+    assert size["조피볼락"]["limit"] == "23cm 이하" and size["갈치"]["measure"] == "항문장"
