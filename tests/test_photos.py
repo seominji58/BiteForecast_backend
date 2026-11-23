@@ -182,8 +182,8 @@ def test_share_verified_journal(client, device, places):
     assert post["category"] == "catch" and post["verified"] is True
     assert post["catch"]["count"] == 3 and post["catch"]["max_length_cm"] == 33
     assert [x["id"] for x in post["photos"]] == [ph["id"]]
-    # 공유해도 포인트는 그대로 (지급 경로는 일지 하나)
-    assert client.get("/api/v1/me/points", headers=device).json()["total_points"] == pts
+    # 공유 글도 다른 글처럼 +5 (2026-11-23 활동 포인트)
+    assert client.get("/api/v1/me/points", headers=device).json()["total_points"] == pts + 5
     # 공유된 인증 사진은 다른 사람도 볼 수 있다
     other = signup(client)
     assert client.get(f"/api/v1/photos/{ph['id']}", headers=other).status_code == 200

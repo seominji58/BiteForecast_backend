@@ -75,24 +75,28 @@ def verified(client, device, **kw) -> dict:
     return j
 
 
-def test_no_points_without_verification(client, device, places):
-    """저장만 하거나 사진만 올려서는 포인트가 없다"""
+def test_points_without_verification(client, device, places):
+    """2026-11-23: 사진 인증 없이 기록만으로 포인트 (기록 10 + 첫 낚시터 15 + 어종·크기 5)"""
     out = create(client, device, place_id=places[0], species_code="rockfish", max_length_cm=30)
-    assert out["point_delta"] == 0 and out["journal"]["verification"]["status"] == "none"
-    photo = upload(client, device)
-    out = create(client, device, place_id=places[0], photo_ids=[photo["id"]])
-    assert out["point_delta"] == 0 and out["journal"]["photo_count"] == 1
-    # 인증 신청(대기)만으로도 없음
-    jid = out["journal"]["id"]
-    res = client.put(
-        f"{URL}/{jid}",
-        json=body(
-            place_id=places[0], species_code="rockfish", photo_ids=[photo["id"]], request_verification=True
-        ),
-        headers=device,
-    ).json()
-    assert res["journal"]["verification"]["status"] == "pending" and res["point_delta"] == 0
-    assert total(client, device) == 0
+    assert out["point_delta"] == 30 and out["journal"]["verification"]["status"] == "none"
+    assert total(client, device) == 30
+
+
+def test_post_and_comment_points_daily_cap(client, device, places):
+    """글 +5 하루 3개까지, 댓글 +1 하루 10개까지, 지우면 회수"""
+    P = "/api/v1/community/posts"
+    ids = []
+    for i in range(4):
+        res = client.post(P, json={"category": "free", "title": f"글{i}", "body": "내용"}, headers=device)
+        assert res.status_code == 201, res.text
+        ids.append(res.json()["id"])
+    assert total(client, device) == 15  # 4번째 글은 하루 한도 밖
+    for i in range(11):
+        client.post(f"{P}/{ids[0]}/comments", json={"body": f"댓글{i}"}, headers=device)
+    assert total(client, device) == 25
+    assert client.delete(f"{P}/{ids[0]}", headers=device).status_code == 204
+    # 첫 글을 지우면 4번째 글이 하루 3개 안으로 들어온다 → 글 점수는 그대로 15, 그 글의 댓글은 남는다
+    assert total(client, device) == 25
 
 
 def test_points_basic(client, device, places):
@@ -114,36 +118,6 @@ def test_double_approve_and_resave_do_not_double_award(client, device, places):
     same = body(place_id=places[0], species_code="mackerel", max_length_cm=25)
     res = client.put(f"{URL}/{j['id']}", json=same, headers=device).json()  # photo_ids 없음 = 사진 변경 없음
     assert res["point_delta"] == 0 and res["journal"]["verification"]["status"] == "approved"
-
-
-def test_reject_and_edit_revoke_points(client, device, places):
-    """반려되면 회수 + 사유 표시, 인증 내용 수정 시 다시 검토 대기(포인트 회수)"""
-    j = verified(client, device, place_id=places[1], max_length_cm=40)
-    assert total(client, device) == 30
-    res = client.post(
-        f"/api/v1/admin/verifications/{j['id']}/reject",
-        json={"reason": "물고기가 보이지 않아요"},
-        headers=ADMIN,
-    )
-    assert res.status_code == 200
-    assert total(client, device) == 0
-    got = client.get(f"{URL}/{j['id']}", headers=device).json()["verification"]
-    assert got["status"] == "rejected" and got["reject_reason"] == "물고기가 보이지 않아요"
-
-    # 다시 신청 → 승인
-    assert (
-        client.post(f"{URL}/{j['id']}/verification", headers=device).json()["verification"]["status"]
-        == "pending"
-    )
-    client.post(f"/api/v1/admin/verifications/{j['id']}/approve", headers=ADMIN)
-    assert total(client, device) == 30
-    # 길이 수정 → 대기로 돌아가고 포인트 회수
-    res = client.put(
-        f"{URL}/{j['id']}",
-        json=body(place_id=places[1], species_code="rockfish", max_length_cm=45),
-        headers=device,
-    ).json()
-    assert res["journal"]["verification"]["status"] == "pending" and res["point_delta"] == -30
 
 
 def test_delete_recalculates_and_moves_first_place(client, device, places):

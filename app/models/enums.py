@@ -58,6 +58,8 @@ class PointReason(StrEnum):
     PHOTO_ATTACHED = "PHOTO_ATTACHED"  # +5
     FIRST_PLACE = "FIRST_PLACE"  # +15
     PERSONAL_BEST = "PERSONAL_BEST"  # +20
+    POST_CREATED = "POST_CREATED"  # +5 (하루 3개까지, 2026-11-23 활동 포인트)
+    COMMENT_CREATED = "COMMENT_CREATED"  # +1 (하루 10개까지)
 
 
 class RestrictionType(StrEnum):

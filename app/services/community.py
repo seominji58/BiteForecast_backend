@@ -50,6 +50,7 @@ from app.schemas.community import (
     ReportOut,
 )
 from app.services import photos
+from app.services.points import recompute_points
 from app.services.titles import resolve_title
 
 
@@ -366,7 +367,7 @@ def get_post(db: Session, user: AppUser, post_id: int) -> PostDetailOut:
 def create_post(db: Session, user: AppUser, data: PostIn) -> PostDetailOut:
     values = data.model_dump(exclude={"photo_ids", "journal_id"})
     if data.journal_id is not None:
-        # 내 일지 공유: 조황공유 글, 장소·어종·사진은 일지 것을 그대로 쓴다 (포인트 지급 없음)
+        # 내 일지 공유: 조황공유 글, 장소·어종·사진은 일지 것을 그대로 쓴다 (글 포인트는 다른 글과 같다)
         # 인증은 필요 없다 — 인증 완료면 「인증 조황」 배지가 붙는다. 반려된 기록은 공유하지 않는다
         j = db.get(Journal, data.journal_id)
         if j is None or j.user_id != user.id or j.deleted_at is not None:
@@ -408,6 +409,7 @@ def create_post(db: Session, user: AppUser, data: PostIn) -> PostDetailOut:
     db.flush()
     if data.journal_id is None:
         photos.attach(db, user, data.photo_ids, PhotoPurpose.POST, post=p)
+    recompute_points(db, user)  # 글 +5 (하루 3개까지)
     db.commit()
     return get_post(db, user, p.id)
 
@@ -508,6 +510,7 @@ def delete_post(db: Session, user: AppUser, post_id: int) -> None:
         raise HTTPException(status_code=403, detail="내가 쓴 글만 삭제할 수 있습니다")
     p.deleted_at = utcnow()
     photos.delete_for(db, post=p)  # 글에 올린 사진만 삭제 (공유한 일지 사진은 일지에 남는다)
+    recompute_points(db, user)  # 지운 글의 포인트 회수
     db.commit()
 
 
@@ -522,6 +525,7 @@ def add_comment(db: Session, user: AppUser, post_id: int, data: CommentIn) -> Po
             raise HTTPException(status_code=400, detail="답글에는 다시 답글을 달 수 없습니다")
         parent_id = parent.id
     db.add(Comment(post_id=p.id, user_id=user.id, body=data.body, parent_id=parent_id))
+    recompute_points(db, user)  # 댓글 +1 (하루 10개까지)
     db.commit()
     return get_post(db, user, p.id)
 
@@ -533,6 +537,7 @@ def delete_comment(db: Session, user: AppUser, comment_id: int) -> None:
     if c.user_id != user.id:
         raise HTTPException(status_code=403, detail="내가 쓴 댓글만 삭제할 수 있습니다")
     c.deleted_at = utcnow()
+    recompute_points(db, user)
     db.commit()
 
 
