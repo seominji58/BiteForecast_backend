@@ -19,6 +19,10 @@ class Settings(BaseSettings):
                 return "postgresql+psycopg://" + v[len(prefix):]
         return v
 
+    # 수집기 깨우기 (services/collector_kick): 셋 다 있어야 동작. FLY_APP_NAME 은 Fly 가 자동으로 넣는다
+    fly_api_token: str = ""
+    collector_machine_id: str = ""
+    fly_app_name: str = ""
     data_go_kr_api_key: str = ""
     kma_api_key: str = ""
     # 경기데이터드림(openapi.gg.go.kr) 인증키 — 경기도 낚시어선업 현황 등. 서버에서만 사용

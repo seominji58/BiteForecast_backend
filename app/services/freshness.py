@@ -14,6 +14,7 @@ from app.models import FishingIndex, MarineWarningSnapshot, OceanReading, TideFo
 from app.models.base import utcnow
 from app.models.enums import DataKind
 from app.schemas.summary import DataStatusOut
+from app.services.collector_kick import maybe_kick
 
 # 자료별 기준 (발표·갱신 주기에 맞춤)
 # - 단기예보: 3시간마다 발표(02·05·…·23시), 발표 10분 뒤 제공, 수집 1시간 주기
@@ -40,6 +41,8 @@ def data_status(db: Session) -> DataStatusOut:
     index = db.scalar(select(func.max(FishingIndex.fetched_at)))
 
     now = utcnow()
+    # 수집이 오래 멈췄으면 수집기 머신을 깨운다 (Fly 예약 실행이 빠지는 때 대비, 15분에 한 번)
+    maybe_kick(forecast)
 
     # 출조 탐색은 예보(파고·풍속)와 특보로 판단 → 둘 중 하나라도 오래되면 「오래됨」
     forecast_old = forecast_issued is None or now - forecast_issued > FORECAST_STALE_AFTER
