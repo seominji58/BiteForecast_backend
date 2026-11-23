@@ -166,11 +166,14 @@ def _make_fresh():
 
 def test_stale_and_warning_collection_failed_together(warn_places, collector_file):
     """자료 만료 + 특보 API 수집 실패가 동시에: 원인은 수집 실패, 문제 목록엔 둘 다"""
-    _set_status(collector_file, {
-        "state": "partial",
-        "stats": {"warning_errors": 1},
-        "warning_collection": {"ok": False, "at": utcnow().isoformat()},
-    })
+    _set_status(
+        collector_file,
+        {
+            "state": "partial",
+            "stats": {"warning_errors": 1},
+            "warning_collection": {"ok": False, "at": utcnow().isoformat()},
+        },
+    )
     _make_stale()
     try:
         w = _eval(warn_places["특보-대천"])
@@ -183,12 +186,15 @@ def test_stale_and_warning_collection_failed_together(warn_places, collector_fil
 
 def test_collector_failure_is_not_warning_failure(warn_places, collector_file):
     """수집기 주기 전체 실패(예: 조위 단계 예외)는 특보 API 실패로 보지 않는다"""
-    _set_status(collector_file, {
-        "state": "failed",
-        "stats": None,
-        # 마지막으로 특보를 실제로 호출했던 주기는 성공
-        "warning_collection": {"ok": True, "at": (utcnow() - timedelta(hours=5)).isoformat()},
-    })
+    _set_status(
+        collector_file,
+        {
+            "state": "failed",
+            "stats": None,
+            # 마지막으로 특보를 실제로 호출했던 주기는 성공
+            "warning_collection": {"ok": True, "at": (utcnow() - timedelta(hours=5)).isoformat()},
+        },
+    )
     _make_stale()
     try:
         w = _eval(warn_places["특보-대천"])
@@ -216,19 +222,25 @@ def test_old_failed_stats_are_not_read_as_current(warn_places, collector_file):
 
 def test_fresh_snapshot_after_failure_clears_failure(warn_places, collector_file):
     """실패 기록보다 나중에 받은 스냅샷이 있으면 수집 실패로 보지 않는다"""
-    _set_status(collector_file, {
-        "state": "partial",
-        "warning_collection": {"ok": False, "at": (utcnow() - timedelta(hours=1)).isoformat()},
-    })
+    _set_status(
+        collector_file,
+        {
+            "state": "partial",
+            "warning_collection": {"ok": False, "at": (utcnow() - timedelta(hours=1)).isoformat()},
+        },
+    )
     w = _eval(warn_places["특보-대천"])
     assert w.status == "nearby" and w.issues == []
 
 
 def test_stale_only(warn_places, collector_file):
-    _set_status(collector_file, {
-        "state": "success",
-        "warning_collection": {"ok": True, "at": utcnow().isoformat()},
-    })
+    _set_status(
+        collector_file,
+        {
+            "state": "success",
+            "warning_collection": {"ok": True, "at": utcnow().isoformat()},
+        },
+    )
     _make_stale()
     try:
         w = _eval(warn_places["특보-대천"])
@@ -257,3 +269,17 @@ def test_conditions_include_warning(client, warn_places):
     r = client.get(f"/api/v1/places/{warn_places['특보-김녕']}/conditions", params={"date": str(today_kst())})
     w = r.json()["place"]["warning"]
     assert w["level"] == "warning" and w["seas"] == ["제주도"] and w["source"] == "기상청 기상특보"
+
+
+def test_land_only_warnings_are_ignored(warn_places):
+    """건조·황사·폭염 같은 육상 특보는 낚시 장소 특보로 잡지 않는다 (2026-11-23)"""
+    pid = warn_places["특보-대천"]
+    w = _with_snapshot(
+        [{"type": "건조주의보", "areas": ["충청남도(보령, 서천)"]}],
+        [{"type": "황사 예비특보", "when": "11월 24일 오전", "areas": ["충청남도"]}],
+        lambda: _eval(pid),
+    )
+    assert w.level == "none" and not w.active and not w.preliminary
+    # 강풍은 갯바위·방파제 안전에 관계있어 그대로 「인근」
+    w2 = _with_snapshot([{"type": "강풍주의보", "areas": ["충청남도(보령)"]}], [], lambda: _eval(pid))
+    assert w2.level == "nearby" and w2.active[0].type == "강풍주의보"

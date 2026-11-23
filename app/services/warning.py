@@ -28,6 +28,9 @@ from app.services import warning_refresh
 
 STALE_AFTER = timedelta(hours=3)
 MARINE_TYPES = ("풍랑", "폭풍해일", "태풍", "해일")
+# 바다·갯바위 낚시 안전과 관계없는 육상 특보는 장소 판정에서 뺀다
+# (2026-11-23: 건조주의보가 「인근 특보」로 잡히던 문제)
+NOT_RELEVANT = ("건조", "황사", "폭염")
 
 # 도(시·도 약칭) → 속한 바다. 도 이름 자체도 키워드로 쓴다
 SIDO_SEA = {
@@ -170,6 +173,8 @@ def evaluate(db: Session, place: Place, snap=_UNSET, health: tuple[bool, bool] |
     matched: list[WarningMatchOut] = []
     level = "none"
     for w in active:
+        if any(t in w["type"] for t in NOT_RELEVANT):
+            continue
         areas = [a for a in w["areas"] if _matches(a, seas, sido)]
         if not areas:
             continue
@@ -192,7 +197,7 @@ def evaluate(db: Session, place: Place, snap=_UNSET, health: tuple[bool, bool] |
             severe=False,
         )
         for p in prelim
-        if any(_matches(a, seas, sido) for a in p["areas"])
+        if not any(t in p["type"] for t in NOT_RELEVANT) and any(_matches(a, seas, sido) for a in p["areas"])
     ]
     if level == "none" and prelim_matched:
         level = "preliminary"
