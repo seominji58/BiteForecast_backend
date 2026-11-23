@@ -39,10 +39,12 @@ def main(apply: bool) -> None:
             continue
         added.append((p.name, st.name, round(d, 1)))
         if apply:
-            db.add(PlaceStation(place_id=p.id, role=StationRole.TIDE, station_id=st.id, distance_km=round(d, 1)))
+            ps = PlaceStation(place_id=p.id, role=StationRole.TIDE, station_id=st.id, distance_km=round(d, 1))
+            db.add(ps)
     for a in added:
         print("  연결", *a)
-    print(f"{'적용' if apply else '미리 보기'}: {len(added)}곳 연결 (조석 지점 {len(tides)}곳, 기준 {TIDE_MAX_KM:.0f}km)")
+    mode = "적용" if apply else "미리 보기"
+    print(f"{mode}: {len(added)}곳 연결 (조석 지점 {len(tides)}곳, 기준 {TIDE_MAX_KM:.0f}km)")
     if apply:
         db.commit()
     db.close()

@@ -27,7 +27,8 @@ from app.models.enums import PlaceType, StationKind, StationRole
 HERE = Path(__file__).parent
 PROVIDER = "KHOA"
 MAX_KM = 30.0  # 관측소 연결 최대 거리
-TIDE_MAX_KM = 60.0  # 조석 예보지점은 42곳뿐 — 60km까지 연결하고 30km 넘으면 앱이 「참고」로 표시 (scripts/remap_tide.py)
+# 조석 예보지점은 42곳뿐 — 60km까지 연결하고 30km 넘으면 앱이 「참고」로 표시 (scripts/remap_tide.py)
+TIDE_MAX_KM = 60.0
 
 
 def _upsert_station(
