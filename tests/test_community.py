@@ -222,3 +222,38 @@ def test_legacy_author_hides_internal_id(client):
     got = [x for x in client.get(f"{URL}/posts").json() if x["title"] == "예전 글"]
     assert got and got[0]["author"]["nickname"] == "이전 사용자"
     assert str(uid) not in got[0]["author"]["nickname"]
+
+
+def test_my_spots(client):
+    """내 낚시터: 본인만 보고, 가까운 공식 낚시터를 붙이고, 고치고 지운다"""
+    from app.core.db import SessionLocal
+    from app.models import Place, Region
+
+    with SessionLocal() as db:
+        r = Region(name="스팟 테스트 해역")
+        r.places = [Place(name="스팟 근처 방파제", lat=35.10, lon=129.04)]
+        db.add(r)
+        db.commit()
+        near_id = r.places[0].id
+    url = "/api/v1/me/spots"
+    a, b = signup(client), signup(client)
+    assert client.get(url).status_code == 401
+    res = client.post(
+        url, json={"name": "  내 갯바위 ", "lat": 35.11, "lon": 129.05, "memo": "새벽 들물"}, headers=a
+    )
+    assert res.status_code == 201, res.text
+    spot = res.json()
+    assert spot["name"] == "내 갯바위" and spot["memo"] == "새벽 들물"
+    assert spot["near"]["id"] == near_id and spot["near"]["km"] < 2
+    # 바다 범위 밖 좌표·빈 이름은 거절
+    assert client.post(url, json={"name": "x", "lat": 10, "lon": 129}, headers=a).status_code == 422
+    assert client.post(url, json={"name": "", "lat": 35.1, "lon": 129}, headers=a).status_code == 422
+    # 다른 사람은 못 보고 못 고친다
+    assert client.get(url, headers=b).json() == []
+    assert client.patch(f"{url}/{spot['id']}", json={"name": "남의 것"}, headers=b).status_code == 404
+    assert client.delete(f"{url}/{spot['id']}", headers=b).status_code == 404
+    res = client.patch(f"{url}/{spot['id']}", json={"memo": None}, headers=a)
+    assert res.json()["memo"] is None and res.json()["name"] == "내 갯바위"
+    assert [s["id"] for s in client.get(url, headers=a).json()] == [spot["id"]]
+    assert client.delete(f"{url}/{spot['id']}", headers=a).status_code == 204
+    assert client.get(url, headers=a).json() == []

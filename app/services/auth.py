@@ -41,6 +41,7 @@ from app.models import (
     TripMember,
     TripPlan,
     TripStop,
+    UserSpot,
 )
 from app.models.base import utcnow
 from app.schemas.auth import AccountOut, Agreements, AuthOut, GoogleSignupNeeded, MergeInfo, SignupNeeded
@@ -401,6 +402,7 @@ def merge_users(db: Session, src: AppUser, dst: AppUser) -> None:
     faved = select(Favorite.place_id).where(Favorite.user_id == dst.id)
     db.execute(delete(Favorite).where(Favorite.user_id == src.id, Favorite.place_id.in_(faved)))
     db.execute(update(Favorite).where(Favorite.user_id == src.id).values(user_id=dst.id))
+    db.execute(update(UserSpot).where(UserSpot.user_id == src.id).values(user_id=dst.id))
     # 포인트는 인증 완료 기록으로 다시 계산 (원장 재계산이라 중복 지급 없음)
     db.execute(delete(PointLedger).where(PointLedger.user_id == src.id))
     src.deleted_at = utcnow()
@@ -447,6 +449,7 @@ def delete_account(db: Session, account: Account) -> None:
     )
     db.execute(delete(PostLike).where(PostLike.user_id == uid))
     db.execute(delete(Favorite).where(Favorite.user_id == uid))
+    db.execute(delete(UserSpot).where(UserSpot.user_id == uid))
     # 함께 가는 출조: 내가 참여한 다른 사람의 계획에서는 빠지고, 내가 맡은 준비물 담당도 내려놓는다
     db.execute(delete(TripMember).where(TripMember.user_id == uid))
     db.execute(
