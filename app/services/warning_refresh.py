@@ -29,7 +29,12 @@ REFRESH_AFTER = timedelta(minutes=15)
 RETRY_AFTER_FAIL_SECONDS = 300
 KEEP_SNAPSHOTS = 96  # 15분마다면 약 하루치. 판정은 최신 1건만 쓴다
 
+WAIT_IF_OLDER = timedelta(minutes=30)
+WAIT_SECONDS = 2.0
+
 _lock = threading.Lock()
+_done = threading.Event()
+_done.set()
 _running = False
 _last_fail = 0.0
 _listeners: list[Callable[[], None]] = []
@@ -89,6 +94,7 @@ def maybe_refresh(
         if _running or time.monotonic() - _last_fail < RETRY_AFTER_FAIL_SECONDS:
             return False
         _running = True
+        _done.clear()
     threading.Thread(
         target=_run, args=(fetch or _fetch_and_store,), daemon=True, name="warning-refresh"
     ).start()
@@ -109,6 +115,17 @@ def _run(fetch: Callable[[], None]) -> None:
     finally:
         with _lock:
             _running = False
+            _done.set()
+
+
+def should_wait(fetched_at: datetime | None, now: datetime | None = None) -> bool:
+    """아주 오래된(30분↑) 특보면 이번 요청이 새로 받을 때까지 잠깐 기다린다"""
+    return fetched_at is None or (now or utcnow()) - fetched_at > WAIT_IF_OLDER
+
+
+def wait_for_refresh(timeout: float = WAIT_SECONDS) -> bool:
+    """진행 중인 갱신이 끝나길 최대 timeout 초 기다린다. 끝났으면 True"""
+    return _done.wait(timeout)
 
 
 def _fetch_and_store() -> None:

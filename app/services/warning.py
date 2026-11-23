@@ -122,9 +122,16 @@ def _aware(t: datetime) -> datetime:
 
 
 def latest_snapshot(db: Session) -> MarineWarningSnapshot | None:
-    snap = db.scalar(select(MarineWarningSnapshot).order_by(MarineWarningSnapshot.fetched_at.desc()).limit(1))
-    # 15분 넘게 지났으면 뒤에서 새로 받는다 (이번 응답은 기다리지 않음, services/warning_refresh.py)
-    warning_refresh.maybe_refresh(snap.fetched_at if snap else None)
+    q = select(MarineWarningSnapshot).order_by(MarineWarningSnapshot.fetched_at.desc()).limit(1)
+    snap = db.scalar(q)
+    fetched = snap.fetched_at if snap else None
+    # 15분 넘게 지났으면 뒤에서 새로 받는다 (services/warning_refresh.py)
+    started = warning_refresh.maybe_refresh(fetched)
+    # 30분 넘게 오래됐으면 옛 특보를 먼저 보여주지 않게 최대 2초 기다렸다가 다시 읽는다 (2026-11-23)
+    if (started or warning_refresh._running) and warning_refresh.should_wait(fetched):
+        if warning_refresh.wait_for_refresh():
+            db.expire_all()
+            snap = db.scalar(q) or snap
     return snap
 
 
