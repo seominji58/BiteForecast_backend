@@ -89,3 +89,16 @@ def test_store_snapshot_keeps_recent():
             wr.store_snapshot(db, WarningStatus(issued_at=None))
         db.commit()
         assert db.query(MarineWarningSnapshot).count() == wr.KEEP_SNAPSHOTS
+
+
+def test_wait_for_refresh_and_should_wait():
+    _reset()
+    now = utcnow()
+    assert wr.should_wait(None) and wr.should_wait(now - timedelta(minutes=31), now)
+    assert not wr.should_wait(now - timedelta(minutes=20), now)
+    gate = threading.Event()
+    assert wr.maybe_refresh(now - timedelta(hours=1), enabled=lambda: True, fetch=lambda: gate.wait(2))
+    assert not wr.wait_for_refresh(0.05)  # 아직 받는 중
+    gate.set()
+    assert wr.wait_for_refresh(1.0)
+    _reset()

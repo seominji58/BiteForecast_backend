@@ -352,11 +352,12 @@ def _collect_fishing_index(db, client, today: date, stations: list[Station], sta
     """국립해양조사원 바다낚시지수. 한 번 호출로 전국 지점이 오므로 매핑된 지점만 골라 저장한다"""
     if not stations:
         return
-    # 연결된 모든 지점에 오늘 자료가 있고 6시간 안에 받았으면 건너뜀 (새로 연결된 지점이 있으면 다시 받음)
+    # 연결된 모든 지점에 오늘 자료가 있고 50분 안에 받았으면 건너뜀 (새로 연결된 지점이 있으면 다시 받음)
+    # 2026-11-23: 6시간 → 50분. 전국이 한 번 호출이라 매시간 받아도 하루 24번 — 새 발표를 최대 1시간 안에 반영
     covered = set(
         db.scalars(
             select(FishingIndex.station_id).where(
-                FishingIndex.day == today, FishingIndex.fetched_at >= utcnow() - timedelta(hours=6)
+                FishingIndex.day == today, FishingIndex.fetched_at >= utcnow() - timedelta(minutes=50)
             )
         ).all()
     )
