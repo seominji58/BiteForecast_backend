@@ -3,7 +3,7 @@
 - 관측소: seeds/stations.json (국립해양조사원 API 응답으로 확인한 목록), seeds/fishing_points.json
 - 장소: seeds/places.json (scripts/build_places.py 로 생성)
 - 장소마다 다음을 연결하고 거리를 저장한다 (FR-07)
-  · tide: 가장 가까운 조석 예보지점 (MAX_KM 이내)
+  · tide: 가장 가까운 조석 예보지점 (TIDE_MAX_KM 60km 이내, 30km 넘으면 앱에서 참고 표시)
   · ocean: 파고·풍속을 관측하는 가장 가까운 부이 (MAX_KM 이내)
   · forecast: 기상청 단기예보 격자 — 부이가 있으면 부이 위치 격자(실측과 같은 지점), 없으면 장소 위치 격자
   · fishing_index: 가장 가까운 바다낚시지수 지점 (먼 경우 비교 화면에서 「가까운 지수 지점 없음」)
@@ -27,6 +27,7 @@ from app.models.enums import PlaceType, StationKind, StationRole
 HERE = Path(__file__).parent
 PROVIDER = "KHOA"
 MAX_KM = 30.0  # 관측소 연결 최대 거리
+TIDE_MAX_KM = 60.0  # 조석 예보지점은 42곳뿐 — 60km까지 연결하고 30km 넘으면 앱이 「참고」로 표시 (scripts/remap_tide.py)
 
 
 def _upsert_station(
@@ -124,7 +125,7 @@ def main() -> None:
                     setattr(pi, k, info.get(k) if k != "source" else info.get(k, "알 수 없음"))
                 db.add(pi)
 
-                tide_st, tide_d = _nearest(place, tides)
+                tide_st, tide_d = _nearest(place, tides, max_km=TIDE_MAX_KM)
                 _map(db, place, StationRole.TIDE, tide_st, tide_d)
                 buoy_st, buoy_d = _nearest(place, buoys)
                 _map(db, place, StationRole.OCEAN, buoy_st, buoy_d)
