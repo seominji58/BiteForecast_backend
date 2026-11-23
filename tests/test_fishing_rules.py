@@ -33,3 +33,16 @@ def test_known_values():
     assert not ban["꽃게"]["notice"] and ban["꽃게"]["periods"][0]["from"] == "06-21"  # 고시 제2024-40호
     assert {f["name"] for f in d["female"]} == {"대게", "붉은대게", "꽃게", "민꽃게"}
     assert size["조피볼락"]["limit"] == "23cm 이하" and size["갈치"]["measure"] == "항문장"
+
+
+def test_species_seasons(client):
+    fishing_rules._seasons.cache_clear()
+    d = client.get("/api/v1/meta/species-seasons").json()
+    sp = d["species"]
+    assert "잘 잡히는 시기" in d["notice"]
+    assert sp["black_porgy"]["periods"][0]["months"] == [3, 4, 5, 6, 7]
+    assert sp["greenling"]["periods"][1]["months"] == [10, 11, 12, 1]  # 해를 넘김
+    assert sp["rockfish"]["kind"] == "birth"
+    for code, s in sp.items():
+        for p in s["periods"]:
+            assert all(1 <= m <= 12 for m in p["months"]) and p["cite"] and p["url"], code

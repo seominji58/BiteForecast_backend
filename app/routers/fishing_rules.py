@@ -55,3 +55,18 @@ def _data() -> dict:
 def fishing_rules(response: Response):
     response.headers["Cache-Control"] = "public, max-age=21600"
     return _data()
+
+
+_SEASONS = Path(__file__).resolve().parent.parent.parent / "seeds" / "species_seasons.json"
+
+
+@lru_cache(maxsize=1)
+def _seasons() -> dict:
+    return json.loads(_SEASONS.read_text(encoding="utf-8"))
+
+
+@router.get("/meta/species-seasons")
+def species_seasons(response: Response):
+    """앱 어종별 산란기 (수산과학원·국내 논문, scripts/build_species_seasons.py). 잡히는 시기가 아니다"""
+    response.headers["Cache-Control"] = "public, max-age=21600"
+    return _seasons()

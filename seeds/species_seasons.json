@@ -1,0 +1,471 @@
+{
+ "_note": "scripts/build_species_seasons.py 로 생성 — 직접 고치지 말 것",
+ "notice": "산란기는 잘 잡히는 시기와 같지 않아요. 연구된 해역 기준이라 다른 바다는 다를 수 있어요.",
+ "species": {
+  "black_porgy": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "감성돔",
+   "periods": [
+    {
+     "months": [
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "peak": [
+      5,
+      6
+     ],
+     "area": "남해 여수",
+     "cite": "Kwon 외 2009, 한국어류학회지 21(2)",
+     "url": "https://koreascience.or.kr/article/JAKO200910102404958.pub?lang=en",
+     "note": null
+    },
+    {
+     "months": [
+      4,
+      5
+     ],
+     "peak": [],
+     "area": "남해 통영",
+     "cite": "이해원 외 2021, 한국어류학회지 33(1)",
+     "url": "https://koreascience.or.kr/article/JAKO202123258346415.pub?lang=ko",
+     "note": null
+    }
+   ]
+  },
+  "rockfish": {
+   "kind": "birth",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "우럭(조피볼락)",
+   "periods": [
+    {
+     "months": [
+      4,
+      5
+     ],
+     "peak": [],
+     "area": null,
+     "cite": "Baek 외 2000, 한국수산과학회지 33(5)",
+     "url": "https://koreascience.kr/article/JAKO200024839399930.page?lang=ko",
+     "note": "교미 11~12월"
+    }
+   ]
+  },
+  "black_rockfish": {
+   "kind": "birth",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "볼락",
+   "periods": [
+    {
+     "months": [
+      1,
+      2
+     ],
+     "peak": [],
+     "area": "경남 통영",
+     "cite": "이택열·김성연 1992, 한국수산과학회지 25(5)",
+     "url": "https://koreascience.kr/article/JAKO199223607640482.page?lang=ko",
+     "note": "교미 12월"
+    },
+    {
+     "months": [
+      2
+     ],
+     "peak": [],
+     "area": "남해 여수",
+     "cite": "김희용 외 2010, 한국수산기술학회지 46(4)",
+     "url": "https://koreascience.kr/article/JAKO201008863883144.pdf",
+     "note": null
+    }
+   ]
+  },
+  "greenling": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "노래미(쥐노래미)",
+   "periods": [
+    {
+     "months": [
+      9,
+      10,
+      11,
+      12
+     ],
+     "peak": [
+      11
+     ],
+     "area": "서해",
+     "cite": "Kang 외 2004, 한국양식학회지 17(1)",
+     "url": "https://koreascience.kr/article/JAKO200411922205314.page?lang=ko",
+     "note": null
+    },
+    {
+     "months": [
+      10,
+      11,
+      12,
+      1
+     ],
+     "peak": [
+      11,
+      12
+     ],
+     "area": "인천 연안",
+     "cite": "Lee 외 2023, 한국어류학회지 35(4)",
+     "url": "https://koreascience.or.kr/article/JAKO202319156693042.page?lang=ko",
+     "note": null
+    }
+   ]
+  },
+  "mullet": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "숭어",
+   "periods": [
+    {
+     "months": [
+      11,
+      12,
+      1
+     ],
+     "peak": [
+      12
+     ],
+     "area": "제주",
+     "cite": "Kim 외 2004, 환경독성학회지 19(1)",
+     "url": "https://koreascience.kr/article/JAKO200412910502037.page?lang=ko",
+     "note": null
+    },
+    {
+     "months": [
+      11,
+      12,
+      1
+     ],
+     "peak": [],
+     "area": "여수",
+     "cite": "Zhang 외 2011, 수산해양기술연구 47(3)",
+     "url": "https://koreascience.kr/article/JAKO201126235932904.page?lang=ko",
+     "note": null
+    }
+   ]
+  },
+  "webfoot_octopus": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "주꾸미",
+   "periods": [
+    {
+     "months": [
+      4,
+      5,
+      6
+     ],
+     "peak": [
+      5,
+      6
+     ],
+     "area": "서해 부안",
+     "cite": "Son 외 2015, 한국패류학회지 31(2)",
+     "url": "https://koreascience.kr/article/JAKO201523047606750.page",
+     "note": null
+    },
+    {
+     "months": [
+      12,
+      1,
+      2,
+      3,
+      4,
+      5
+     ],
+     "peak": [
+      3,
+      4,
+      5
+     ],
+     "area": "남해 전남",
+     "cite": "Moon 외 2022, 한국수산과학회지 55(1)",
+     "url": "https://koreascience.kr/article/JAKO202210351366840.page",
+     "note": null
+    }
+   ]
+  },
+  "octopus": {
+   "kind": "spawn",
+   "temps": [
+    {
+     "text": "대문어 어장: 바닥 수온 10℃ 미만에서 형성, 18℃ 넘으면 깊은 곳으로 이동 (동해 중부)",
+     "cite": "Seo 외 2022, 수산해양기술연구 58(4)",
+     "url": "https://koreascience.kr/article/JAKO202208757735339.page"
+    }
+   ],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "문어",
+   "periods": [
+    {
+     "months": [
+      5,
+      6,
+      9
+     ],
+     "peak": [
+      9
+     ],
+     "area": "참문어 · 남해 통영·사천",
+     "cite": "Kang 외 2009, 한국패류학회지 25(2)",
+     "url": "https://koreascience.or.kr/article/JAKO200934152713250.page?lang=ko",
+     "note": null
+    },
+    {
+     "months": [
+      2,
+      3,
+      4,
+      5
+     ],
+     "peak": [
+      3,
+      4,
+      5
+     ],
+     "area": "대문어 · 동해 강원",
+     "cite": "Lee 외 2014, 수산해양기술연구 50(2)",
+     "url": "https://koreascience.kr/article/JAKO201417048539546.page",
+     "note": null
+    }
+   ]
+  },
+  "bigfin_squid": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "무늬오징어",
+   "periods": [
+    {
+     "months": [
+      7,
+      8,
+      9
+     ],
+     "peak": [
+      7
+     ],
+     "area": "제주 (6~11월 조사)",
+     "cite": "Kang 외 2009, 한국패류학회지 25(2)",
+     "url": "https://koreascience.or.kr/article/JAKO200934152713260.page?lang=ko",
+     "note": null
+    }
+   ]
+  },
+  "goby": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "망둥어(문절망둑)",
+   "periods": [
+    {
+     "months": [
+      2,
+      3,
+      4,
+      5
+     ],
+     "peak": [],
+     "area": null,
+     "cite": "Park 외 2005, 한국수산과학회지 38(5)",
+     "url": "https://koreascience.kr/article/JAKO200507523288759.page",
+     "note": null
+    }
+   ]
+  },
+  "red_seabream": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "참돔",
+   "periods": [
+    {
+     "months": [
+      4,
+      5,
+      6,
+      7
+     ],
+     "peak": [],
+     "area": null,
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do",
+     "note": null
+    }
+   ]
+  },
+  "flatfish": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "광어(넙치)",
+   "periods": [
+    {
+     "months": [
+      2,
+      3,
+      4,
+      5,
+      6
+     ],
+     "peak": [],
+     "area": null,
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do",
+     "note": null
+    }
+   ]
+  },
+  "hairtail": {
+   "kind": "spawn",
+   "temps": [
+    {
+     "text": "산란 수온 18~20℃",
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do"
+    }
+   ],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "갈치",
+   "periods": [
+    {
+     "months": [
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "peak": [],
+     "area": "서·남해 연안",
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do",
+     "note": null
+    }
+   ]
+  },
+  "cuttlefish": {
+   "kind": "spawn",
+   "temps": [
+    {
+     "text": "산란 수온 13~19℃ · 서식 수온 10~26℃",
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do"
+    }
+   ],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "갑오징어",
+   "periods": [
+    {
+     "months": [
+      4,
+      5,
+      6
+     ],
+     "peak": [],
+     "area": null,
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do",
+     "note": null
+    }
+   ]
+  },
+  "horse_mackerel": {
+   "kind": "spawn",
+   "temps": [],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "전갱이",
+   "periods": [
+    {
+     "months": [
+      6,
+      7,
+      8
+     ],
+     "peak": [],
+     "area": "제주도 근해",
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do",
+     "note": null
+    }
+   ]
+  },
+  "seabass": {
+   "kind": "spawn",
+   "temps": [],
+   "text": "산란기 봄철 (월은 원문에 없음)",
+   "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+   "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do",
+   "name": "농어",
+   "periods": []
+  },
+  "mackerel": {
+   "kind": "spawn",
+   "temps": [
+    {
+     "text": "산란 수온 15~20℃ (지역마다 다름)",
+     "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+     "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do"
+    }
+   ],
+   "text": null,
+   "cite": null,
+   "url": null,
+   "name": "고등어",
+   "periods": []
+  },
+  "conger": {
+   "kind": "spawn",
+   "temps": [],
+   "text": "산란기 4~5월 · 산란장은 일본 남부 먼바다 (우리 연안에서 산란하지 않음)",
+   "cite": "국립수산과학원 「주요생물 생태와 생활사」",
+   "url": "https://www.nifs.go.kr/contents/actionContentsCons0088.do",
+   "name": "붕장어",
+   "periods": []
+  }
+ }
+}
