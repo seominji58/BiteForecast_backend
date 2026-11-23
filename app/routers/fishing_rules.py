@@ -53,7 +53,8 @@ def _data() -> dict:
 
 @router.get("/meta/fishing-rules", response_model=FishingRulesOut)
 def fishing_rules(response: Response):
-    response.headers["Cache-Control"] = "public, max-age=21600"
+    # 기기 HTTP 캐시가 법령 갱신을 6시간씩 가리지 않게 (2026-11-23)
+    response.headers["Cache-Control"] = "public, max-age=600"
     return _data()
 
 
@@ -68,5 +69,6 @@ def _seasons() -> dict:
 @router.get("/meta/species-seasons")
 def species_seasons(response: Response):
     """앱 어종별 산란기 (수산과학원·국내 논문, scripts/build_species_seasons.py). 잡히는 시기가 아니다"""
-    response.headers["Cache-Control"] = "public, max-age=21600"
+    # 기기 HTTP 캐시가 법령 갱신을 6시간씩 가리지 않게 (2026-11-23)
+    response.headers["Cache-Control"] = "public, max-age=600"
     return _seasons()
