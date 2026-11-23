@@ -15,6 +15,7 @@ from app.routers import (
     admin,
     amenities,
     auth,
+    boat_ports,
     community,
     compare,
     fishing_rules,
@@ -124,6 +125,7 @@ def _clean_msg(msg: str) -> str:
 
 app.include_router(health.router, prefix=API_PREFIX)
 app.include_router(amenities.router, prefix=API_PREFIX)
+app.include_router(boat_ports.router, prefix=API_PREFIX)
 app.include_router(fishing_rules.router, prefix=API_PREFIX)
 app.include_router(places.router, prefix=API_PREFIX)
 app.include_router(me.router, prefix=API_PREFIX)
