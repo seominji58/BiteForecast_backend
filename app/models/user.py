@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, UniqueConstraint
+from sqlalchemy import Boolean, Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UTCDateTime
@@ -81,3 +81,16 @@ class Favorite(TimestampMixin, Base):
 
     user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), primary_key=True)
     place_id: Mapped[int] = mapped_column(ForeignKey("place.id"), primary_key=True)
+
+
+class UserSpot(TimestampMixin, Base):
+    """내 낚시터 — 사용자가 지도에 직접 찍은 비공개 포인트 (2026-11-23). 본인만 본다"""
+
+    __tablename__ = "user_spot"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(40))
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    memo: Mapped[str | None] = mapped_column(String(500))

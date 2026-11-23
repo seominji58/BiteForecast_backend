@@ -9,7 +9,7 @@ from app.models.place import Place, PlaceInfo, PlaceStation, Region, Species, St
 from app.models.points import PointLedger, Title
 from app.models.regulation import RegulationReport, Restriction
 from app.models.trip import TripChecklistItem, TripInvite, TripMember, TripPlan, TripStop
-from app.models.user import Account, AccountIdentity, AppUser, AuthSession, Favorite
+from app.models.user import Account, AccountIdentity, AppUser, AuthSession, Favorite, UserSpot
 
 __all__ = [
     "Base",
@@ -20,6 +20,7 @@ __all__ = [
     "Comment",
     "ContentReport",
     "Favorite",
+    "UserSpot",
     "FishingIndex",
     "Journal",
     "JournalEnvSnapshot",
