@@ -46,3 +46,12 @@ def test_species_seasons(client):
     for code, s in sp.items():
         for p in s["periods"]:
             assert all(1 <= m <= 12 for m in p["months"]) and p["cite"] and p["url"], code
+
+
+def test_catch_seasons(client):
+    fishing_rules._catch.cache_clear()
+    d = client.get("/api/v1/meta/catch-seasons").json()
+    assert "어업생산동향" in d["source"] and "낚시 조과" in d["notice"]
+    hair = d["species"]["hairtail"]["seas"]
+    assert set(hair) >= {"서해", "남해"} and all(1 <= m <= 12 for m in hair["서해"]["peak"])
+    assert abs(sum(hair["서해"]["share"].values()) - 100) < 1

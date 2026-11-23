@@ -72,3 +72,18 @@ def species_seasons(response: Response):
     # 기기 HTTP 캐시가 법령 갱신을 6시간씩 가리지 않게 (2026-11-23)
     response.headers["Cache-Control"] = "public, max-age=600"
     return _seasons()
+
+
+_CATCH = Path(__file__).resolve().parent.parent.parent / "seeds" / "catch_seasons.json"
+
+
+@lru_cache(maxsize=1)
+def _catch() -> dict:
+    return json.loads(_CATCH.read_text(encoding="utf-8"))
+
+
+@router.get("/meta/catch-seasons")
+def catch_seasons(response: Response):
+    """어종별 바다별 「어획 많은 달」 (통계청 어업생산동향조사). 낚시 조과가 아니다"""
+    response.headers["Cache-Control"] = "public, max-age=600"
+    return _catch()
