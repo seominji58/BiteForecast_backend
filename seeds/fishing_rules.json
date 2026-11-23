@@ -1,6 +1,6 @@
 {
  "_note": "scripts/build_fishing_rules.py 로 생성 — 직접 고치지 말 것",
- "source": "수산자원관리법 시행령 별표1(개정 2026.6.23.)·별표2(개정 2024.6.4.), 국가법령정보센터",
+ "source": "수산자원관리법 시행령 제6조·별표1(개정 2026.6.23.)·별표2(개정 2024.6.4.), 수산자원의 포획금지기간에 관한 고시(제2024-40호), 국가법령정보센터",
  "law_url": "https://www.law.go.kr/법령/수산자원관리법시행령",
  "checked_at": "2026-11-23",
  "notice": "법령 요약이에요. 어업 방법·해역별 예외와 해양수산부·시도 고시는 원문을 확인하세요. 금어기에 잡았거나 금지체장 이하는 바로 놓아주세요. 비어업인도 1천만원 이하 벌금 대상이에요.",
@@ -13,7 +13,8 @@
     {
      "from": "01-16",
      "to": "02-15",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -27,7 +28,8 @@
     {
      "from": "12-01",
      "to": "01-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -41,7 +43,8 @@
     {
      "from": "10-01",
      "to": "11-30",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -55,7 +58,8 @@
     {
      "from": "05-01",
      "to": "07-15",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -69,7 +73,8 @@
     {
      "from": "11-01",
      "to": "12-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -83,7 +88,8 @@
     {
      "from": "06-01",
      "to": "07-15",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -97,7 +103,8 @@
     {
      "from": "07-01",
      "to": "07-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -111,7 +118,8 @@
     {
      "from": "07-01",
      "to": "07-31",
-     "region": "북위 33도 이북 해역"
+     "region": "북위 33도 이북 해역",
+     "year": null
     }
    ],
    "notice": false,
@@ -123,13 +131,14 @@
    "sci": "Scomber japonicus",
    "periods": [
     {
-     "from": "04-01",
-     "to": "06-30",
-     "region": null
+     "from": "05-01",
+     "to": "05-31",
+     "region": null,
+     "year": 2026
     }
    ],
    "notice": true,
-   "note": "4.1~6.30 중 1개월을 해양수산부장관이 고시"
+   "note": "4.1~6.30 중 1개월을 해마다 해양수산부장관이 고시 (2026년 5.1~5.31, 고시 제2024-40호) · 소형선망·제주 정치망은 4.1~4.30"
   },
   {
    "name": "말쥐치",
@@ -139,7 +148,8 @@
     {
      "from": "05-01",
      "to": "07-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -153,7 +163,8 @@
     {
      "from": "07-21",
      "to": "08-20",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -167,7 +178,8 @@
     {
      "from": "01-01",
      "to": "12-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -181,7 +193,8 @@
     {
      "from": "05-01",
      "to": "05-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -195,7 +208,8 @@
     {
      "from": "05-01",
      "to": "05-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -207,13 +221,26 @@
    "sci": "Portunus trituberculatus",
    "periods": [
     {
-     "from": "06-01",
-     "to": "09-30",
-     "region": null
+     "from": "06-21",
+     "to": "08-20",
+     "region": "아래 어장 외",
+     "year": null
+    },
+    {
+     "from": "07-01",
+     "to": "08-31",
+     "region": "연평도 주변어장",
+     "year": null
+    },
+    {
+     "from": "07-16",
+     "to": "09-15",
+     "region": "백령·대청·소청 주변어장 등 서해 특정해역",
+     "year": null
     }
    ],
-   "notice": true,
-   "note": "6.1~9.30 중 2개월 이내를 해양수산부장관이 고시"
+   "notice": false,
+   "note": "해양수산부 고시 제2024-40호로 정한 기간"
   },
   {
    "name": "대게류",
@@ -223,7 +250,8 @@
     {
      "from": "06-01",
      "to": "11-30",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -237,7 +265,8 @@
     {
      "from": "07-10",
      "to": "08-25",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -251,7 +280,8 @@
     {
      "from": "05-01",
      "to": "06-30",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -265,12 +295,14 @@
     {
      "from": "06-16",
      "to": "09-30",
-     "region": "아래 지역 외"
+     "region": "아래 지역 외",
+     "year": null
     },
     {
      "from": "06-01",
      "to": "09-30",
-     "region": "부산·울산·경남·전남(무안·영광 제외)·제주"
+     "region": "부산·울산·경남·전남(무안·영광 제외)·제주",
+     "year": null
     }
    ],
    "notice": false,
@@ -284,22 +316,26 @@
     {
      "from": "06-01",
      "to": "06-30",
-     "region": "여수 삼산면"
+     "region": "여수 삼산면",
+     "year": null
     },
     {
      "from": "06-01",
      "to": "08-31",
-     "region": "제주(추자도 제외)"
+     "region": "제주(추자도 제외)",
+     "year": null
     },
     {
      "from": "07-01",
      "to": "08-31",
-     "region": "제주 추자도"
+     "region": "제주 추자도",
+     "year": null
     },
     {
      "from": "06-01",
      "to": "07-31",
-     "region": "울릉도·독도"
+     "region": "울릉도·독도",
+     "year": null
     }
    ],
    "notice": false,
@@ -313,12 +349,14 @@
     {
      "from": "09-01",
      "to": "10-31",
-     "region": "제주 외"
+     "region": "제주 외",
+     "year": null
     },
     {
      "from": "10-01",
      "to": "12-31",
-     "region": "제주"
+     "region": "제주",
+     "year": null
     }
    ],
    "notice": false,
@@ -332,7 +370,8 @@
     {
      "from": "05-01",
      "to": "06-30",
-     "region": "강원·경북"
+     "region": "강원·경북",
+     "year": null
     }
    ],
    "notice": false,
@@ -346,7 +385,8 @@
     {
      "from": "07-01",
      "to": "08-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -360,7 +400,8 @@
     {
      "from": "03-01",
      "to": "06-30",
-     "region": "포항 앞 지정 해역(주7)"
+     "region": "포항 앞 지정 해역(주7)",
+     "year": null
     }
    ],
    "notice": false,
@@ -374,7 +415,8 @@
     {
      "from": "07-01",
      "to": "08-31",
-     "region": "제주"
+     "region": "제주",
+     "year": null
     }
    ],
    "notice": false,
@@ -388,7 +430,8 @@
     {
      "from": "09-01",
      "to": "11-30",
-     "region": "제주"
+     "region": "제주",
+     "year": null
     }
    ],
    "notice": true,
@@ -402,7 +445,8 @@
     {
      "from": "11-01",
      "to": "03-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -416,7 +460,8 @@
     {
      "from": "10-01",
      "to": "01-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -430,7 +475,8 @@
     {
      "from": "07-01",
      "to": "07-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -444,7 +490,8 @@
     {
      "from": "04-01",
      "to": "05-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -458,7 +505,8 @@
     {
      "from": "06-01",
      "to": "06-30",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": true,
@@ -472,7 +520,8 @@
     {
      "from": "05-11",
      "to": "08-31",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": false,
@@ -486,7 +535,8 @@
     {
      "from": "05-16",
      "to": "06-30",
-     "region": null
+     "region": null,
+     "year": null
     }
    ],
    "notice": true,
@@ -811,5 +861,24 @@
   "marbled_flounder": [
    "문치가자미"
   ]
- }
+ },
+ "female": [
+  {
+   "name": "대게",
+   "rule": "암컷 연중 금지"
+  },
+  {
+   "name": "붉은대게",
+   "rule": "암컷 연중 금지"
+  },
+  {
+   "name": "꽃게",
+   "rule": "배에 알이 붙은 암컷 연중 금지"
+  },
+  {
+   "name": "민꽃게",
+   "rule": "배에 알이 붙은 암컷 연중 금지"
+  }
+ ],
+ "exemption_note": "시행령 제6조 ④·⑤항의 금어기·금지체장 달리 적용(유예)은 승인받은 어업자 대상이에요. 낚시인은 위 기준을 그대로 지켜야 해요."
 }

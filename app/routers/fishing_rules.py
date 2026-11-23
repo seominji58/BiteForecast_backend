@@ -42,6 +42,8 @@ class FishingRulesOut(BaseModel):
     ban: list[BanOut]
     size: list[SizeOut]
     app_species: dict[str, list[str]]
+    female: list[dict] = []
+    exemption_note: str | None = None
 
 
 @lru_cache(maxsize=1)

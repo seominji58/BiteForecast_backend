@@ -8,6 +8,8 @@
 - region: 그 기간이 적용되는 곳(없으면 전국)
 - notice: 해수부·시도 고시로 실제 기간이 정해짐 → 앱은 「고시 확인」으로만 안내
 - 지난 한시 규정(2024년 가자미류 17cm)은 넣지 않았다.
+- 2026-11-23: 포획금지기간 고시(제2024-40호) 반영 — 꽃게 6.21~8.20(어장별 예외), 고등어 연도별(2026 5.1~5.31).
+  시행령 제6조 ③항 암컷 포획금지 추가. ④·⑤항 유예는 승인 어업자 대상이라 낚시인 기준에서 뺀다
 
 실행: .venv/bin/python -m scripts.build_fishing_rules
 """
@@ -18,8 +20,9 @@ from pathlib import Path
 OUT = Path(__file__).resolve().parent.parent / "seeds" / "fishing_rules.json"
 
 
-def p(frm, to, region=None):
-    return {"from": frm, "to": to, "region": region}
+def p(frm, to, region=None, year=None):
+    # year: 그해에만 적용 (해마다 고시로 바뀌는 기간)
+    return {"from": frm, "to": to, "region": region, "year": year}
 
 
 # (이름, 분류, 학명, 기간들, 고시 여부, 비고)
@@ -57,9 +60,10 @@ BAN = [
         "고등어",
         "어류",
         "Scomber japonicus",
-        [p("04-01", "06-30")],
+        [p("05-01", "05-31", None, 2026)],
         True,
-        "4.1~6.30 중 1개월을 해양수산부장관이 고시",
+        "4.1~6.30 중 1개월을 해마다 해양수산부장관이 고시 (2026년 5.1~5.31, 고시 제2024-40호) "
+        "· 소형선망·제주 정치망은 4.1~4.30",
     ),
     (
         "말쥐치",
@@ -77,9 +81,13 @@ BAN = [
         "꽃게",
         "갑각류",
         "Portunus trituberculatus",
-        [p("06-01", "09-30")],
-        True,
-        "6.1~9.30 중 2개월 이내를 해양수산부장관이 고시",
+        [
+            p("06-21", "08-20", "아래 어장 외"),
+            p("07-01", "08-31", "연평도 주변어장"),
+            p("07-16", "09-15", "백령·대청·소청 주변어장 등 서해 특정해역"),
+        ],
+        False,
+        "해양수산부 고시 제2024-40호로 정한 기간",
     ),
     (
         "대게류",
@@ -235,6 +243,14 @@ APP_SPECIES = {
     "marbled_flounder": ["문치가자미"],
 }
 
+# 시행령 제6조 ③항: 연중 포획·채취 금지 암컷
+FEMALE = [
+    {"name": "대게", "rule": "암컷 연중 금지"},
+    {"name": "붉은대게", "rule": "암컷 연중 금지"},
+    {"name": "꽃게", "rule": "배에 알이 붙은 암컷 연중 금지"},
+    {"name": "민꽃게", "rule": "배에 알이 붙은 암컷 연중 금지"},
+]
+
 MEASURE = {
     "전장": "주둥이에서 꼬리지느러미 끝까지",
     "항문장": "주둥이에서 항문까지",
@@ -250,7 +266,8 @@ MEASURE = {
 def main() -> None:
     data = {
         "_note": "scripts/build_fishing_rules.py 로 생성 — 직접 고치지 말 것",
-        "source": "수산자원관리법 시행령 별표1(개정 2026.6.23.)·별표2(개정 2024.6.4.), 국가법령정보센터",
+        "source": "수산자원관리법 시행령 제6조·별표1(개정 2026.6.23.)·별표2(개정 2024.6.4.), "
+        "수산자원의 포획금지기간에 관한 고시(제2024-40호), 국가법령정보센터",
         "law_url": "https://www.law.go.kr/법령/수산자원관리법시행령",
         "checked_at": "2026-11-23",
         "notice": "법령 요약이에요. 어업 방법·해역별 예외와 해양수산부·시도 고시는 원문을 확인하세요. "
@@ -264,6 +281,10 @@ def main() -> None:
             for n, g, lim, m, note in SIZE
         ],
         "app_species": APP_SPECIES,
+        "female": FEMALE,
+        "exemption_note": "시행령 제6조 ④·⑤항의 금어기·금지체장 달리 적용(유예)은 "
+        "승인받은 어업자 대상이에요. "
+        "낚시인은 위 기준을 그대로 지켜야 해요.",
     }
     OUT.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"금어기 {len(BAN)} · 금지체장 {len(SIZE)} → {OUT.name}")

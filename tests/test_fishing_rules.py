@@ -27,7 +27,9 @@ def test_known_values():
     d = fishing_rules._data()
     ban = {b["name"]: b for b in d["ban"]}
     size = {s["name"]: s for s in d["size"]}
-    assert ban["감성돔"]["periods"][0] == {"from": "05-01", "to": "05-31", "region": None}
+    assert ban["감성돔"]["periods"][0] == {"from": "05-01", "to": "05-31", "region": None, "year": None}
     assert ban["문치가자미"]["periods"][0]["from"] == "12-01"  # 해를 넘김
-    assert ban["고등어"]["notice"] and ban["꽃게"]["notice"]  # 고시로 정하는 기간
+    assert ban["고등어"]["notice"] and ban["고등어"]["periods"][0]["year"] == 2026  # 해마다 고시
+    assert not ban["꽃게"]["notice"] and ban["꽃게"]["periods"][0]["from"] == "06-21"  # 고시 제2024-40호
+    assert {f["name"] for f in d["female"]} == {"대게", "붉은대게", "꽃게", "민꽃게"}
     assert size["조피볼락"]["limit"] == "23cm 이하" and size["갈치"]["measure"] == "항문장"
