@@ -22,6 +22,7 @@ from app.routers import (
     geo,
     health,
     journals,
+    marine_issues,
     me,
     nearby,
     photos,
@@ -144,3 +145,4 @@ app.include_router(place_photos.router, prefix=API_PREFIX)
 app.include_router(place_kakao.router, prefix=API_PREFIX)
 app.include_router(rock_points.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
+app.include_router(marine_issues.router, prefix=API_PREFIX)

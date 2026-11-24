@@ -38,6 +38,15 @@ class TempNormalOut(BaseModel):
     source: str
 
 
+class RtTempOut(BaseModel):
+    """국립수산과학원 실시간 연안 수온 (30분 주기, 품질처리 전 — 참고)"""
+
+    v: float
+    t: datetime
+    station: str
+    km: float
+
+
 class PlaceSummaryOut(BaseModel):
     """낚시터 1곳 요약. 실측(obs)과 예보(fc)는 다른 필드다 — 섞어 비교하지 않는다"""
 
@@ -54,6 +63,8 @@ class PlaceSummaryOut(BaseModel):
     temp_obs: ValueAt | None
     # 근처 관측소 예년 같은 달 평균 수온 (실측과 비교해 「평년보다 +1.8°C」, 2026-11-24)
     temp_normal: TempNormalOut | None = None
+    # 국립수산과학원 실시간 연안 수온 (가까운 관측소, 2026-11-24)
+    temp_rt: RtTempOut | None = None
     air_temp_fc_min: ValueAt | None = None
     air_temp_fc_max: ValueAt | None = None
     pop_fc_max: ValueAt | None = None

@@ -7,7 +7,7 @@
 """
 
 import time
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -22,10 +22,11 @@ from app.schemas.summary import (
     MidSeaOut,
     MidSeaPeriodOut,
     PlaceSummaryOut,
+    RtTempOut,
     TideEventOut,
     ValueAt,
 )
-from app.services import warning_refresh
+from app.services import nifs_live, warning_refresh
 from app.services.compare import Prefetch, _place_compare, prefetch
 from app.services.sea_calendar import mulddae_official, official_sun_times, prefetch_sun_background
 from app.services.sea_temp_normal import normal_for
@@ -201,6 +202,16 @@ def _mid_for(seas: list[str], mid: dict[str, MidSeaOut]) -> MidSeaOut | None:
     return next((mid[s] for s in seas if s in mid), None)
 
 
+def _rt_temp(place: Place, sea: str | None) -> RtTempOut | None:
+    """국립수산과학원 실시간 연안 수온 (같은 바다 20km 안 가장 가까운 관측소, 3시간 안 값, 참고)"""
+    stations = nifs_live.live(wait=0).stations
+    hit = nifs_live.nearest_temp(stations, place.lat, place.lon, sea, datetime.now(UTC))
+    if hit is None:
+        return None
+    km, st = hit
+    return RtTempOut(v=st.temp, t=st.at, station=st.name, km=round(km, 1))
+
+
 def summarize_place(
     db: Session, place: Place, day: date, pf: Prefetch | None = None, mid: dict[str, MidSeaOut] | None = None
 ) -> PlaceSummaryOut:
@@ -243,6 +254,7 @@ def summarize_place(
         wind_dir_fc=_dir_at(_find(pc.series, "wind_direction", "forecast"), wpeak),
         temp_obs=_latest(_find(pc.series, "water_temp", "observed")),
         temp_normal=normal_for(place.lat, place.lon, _sea_group(pc.warning.seas), day.month),
+        temp_rt=_rt_temp(place, _sea_group(pc.warning.seas)),
         air_temp_fc_min=_low(_find(pc.series, "air_temp", "forecast"), after),
         air_temp_fc_max=_peak(_find(pc.series, "air_temp", "forecast"), after),
         pop_fc_max=_peak(_find(pc.series, "precipitation_probability", "forecast"), after),

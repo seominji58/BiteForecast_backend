@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     fly_api_token: str = ""
     collector_machine_id: str = ""
     fly_app_name: str = ""
+    # 국립수산과학원 OpenAPI — 서비스마다 키가 따로 나온다 (2026-11-24). NIFS_API_KEY 는 연안정지관측
+    nifs_risa_key: str = ""
+    nifs_redtide_key: str = ""
+    nifs_jelly_key: str = ""
     data_go_kr_api_key: str = ""
     kma_api_key: str = ""
     # 경기데이터드림(openapi.gg.go.kr) 인증키 — 경기도 낚시어선업 현황 등. 서버에서만 사용
