@@ -19,6 +19,8 @@ from app.schemas.summary import TempNormalOut
 
 SEEDS = Path(__file__).resolve().parent.parent.parent / "seeds"
 MAX_KM = 50.0
+# 관측 자료는 제주 관측소를 「남해」로 묶는다 (앱은 제주를 따로 본다)
+SEA_ALIAS = {"제주": {"제주", "남해"}}
 
 
 @lru_cache(maxsize=1)
@@ -44,7 +46,7 @@ def normal_for(lat: float | None, lon: float | None, sea: str | None, month: int
         best = None
         for st in stations:
             v = st.get("monthly", {}).get(str(month))
-            if v is None or (sea and st.get("sea") and st["sea"] != sea):
+            if v is None or (sea and st.get("sea") and st["sea"] not in SEA_ALIAS.get(sea, {sea})):
                 continue
             d = haversine_km(lat, lon, st["lat"], st["lon"])
             if d <= MAX_KM and (best is None or d < best[0]):

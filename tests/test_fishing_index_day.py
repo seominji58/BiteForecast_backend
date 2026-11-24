@@ -98,3 +98,5 @@ def test_temp_normal_nearest_same_sea():
     assert normal_for(37.80, 128.91, "서해", 11) is None or normal_for(37.80, 128.91, "서해", 11).km <= 50
     assert normal_for(33.0, 131.5, None, 11) is None  # 바다 한가운데 먼 곳
     assert normal_for(None, None, "동해", 11) is None
+    j = normal_for(33.557, 126.759, "제주", 11)  # 김녕: 제주 관측소는 자료에서 「남해」
+    assert j is not None and "김녕" in j.station
