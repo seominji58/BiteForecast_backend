@@ -28,6 +28,16 @@ class IndexSummaryOut(BaseModel):
     station_km: float | None
 
 
+class TempNormalOut(BaseModel):
+    """근처 관측소의 예년 같은 달 평균 수온 (국립수산과학원). 실측과 비교하는 참고값"""
+
+    v: float
+    station: str
+    km: float
+    period: str  # 예: 2019~2025
+    source: str
+
+
 class PlaceSummaryOut(BaseModel):
     """낚시터 1곳 요약. 실측(obs)과 예보(fc)는 다른 필드다 — 섞어 비교하지 않는다"""
 
@@ -42,6 +52,8 @@ class PlaceSummaryOut(BaseModel):
     # 가장 센 바람 시각의 풍향 (16방위, 바람이 불어오는 쪽. 예: 북서). 기상청 단기예보 VEC
     wind_dir_fc: str | None = None
     temp_obs: ValueAt | None
+    # 근처 관측소 예년 같은 달 평균 수온 (실측과 비교해 「평년보다 +1.8°C」, 2026-11-24)
+    temp_normal: TempNormalOut | None = None
     air_temp_fc_min: ValueAt | None = None
     air_temp_fc_max: ValueAt | None = None
     pop_fc_max: ValueAt | None = None

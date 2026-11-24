@@ -87,3 +87,14 @@ def test_week_endpoint(client):
     days = [d["date"] for d in r.json()]
     assert days and days[0] == rng["today"] and all(d <= rng["max"] for d in days)
     assert len(client.get("/api/v1/fishing-index/week", params={"start": rng["today"], "days": 30}).json()) <= 7
+
+
+def test_temp_normal_nearest_same_sea():
+    """낚시터 근처 같은 바다 관측소의 같은 달 평균 수온 (최근 자료 우선, 50km 밖이면 없음)"""
+    from app.services.sea_temp_normal import normal_for
+
+    n = normal_for(37.80, 128.91, "동해", 11)  # 강릉 경포 근처
+    assert n is not None and n.period == "2019~2025" and n.km < 5 and n.v == 17.0
+    assert normal_for(37.80, 128.91, "서해", 11) is None or normal_for(37.80, 128.91, "서해", 11).km <= 50
+    assert normal_for(33.0, 131.5, None, 11) is None  # 바다 한가운데 먼 곳
+    assert normal_for(None, None, "동해", 11) is None

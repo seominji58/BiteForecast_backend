@@ -28,6 +28,7 @@ from app.schemas.summary import (
 from app.services import warning_refresh
 from app.services.compare import Prefetch, _place_compare, prefetch
 from app.services.sea_calendar import mulddae_official, official_sun_times, prefetch_sun_background
+from app.services.sea_temp_normal import normal_for
 
 KST = ZoneInfo("Asia/Seoul")
 _TTL_SECONDS = 600
@@ -241,6 +242,7 @@ def summarize_place(
         wind_fc_max=(wpeak := _peak(_find(pc.series, "wind_speed", "forecast"), after)),
         wind_dir_fc=_dir_at(_find(pc.series, "wind_direction", "forecast"), wpeak),
         temp_obs=_latest(_find(pc.series, "water_temp", "observed")),
+        temp_normal=normal_for(place.lat, place.lon, _sea_group(pc.warning.seas), day.month),
         air_temp_fc_min=_low(_find(pc.series, "air_temp", "forecast"), after),
         air_temp_fc_max=_peak(_find(pc.series, "air_temp", "forecast"), after),
         pop_fc_max=_peak(_find(pc.series, "precipitation_probability", "forecast"), after),
