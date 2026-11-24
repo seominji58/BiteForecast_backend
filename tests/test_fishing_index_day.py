@@ -86,7 +86,8 @@ def test_week_endpoint(client):
     assert r.status_code == 200
     days = [d["date"] for d in r.json()]
     assert days and days[0] == rng["today"] and all(d <= rng["max"] for d in days)
-    assert len(client.get("/api/v1/fishing-index/week", params={"start": rng["today"], "days": 30}).json()) <= 7
+    week = client.get("/api/v1/fishing-index/week", params={"start": rng["today"], "days": 30}).json()
+    assert len(week) <= 7
 
 
 def test_temp_normal_nearest_same_sea():
