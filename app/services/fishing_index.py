@@ -14,7 +14,13 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import FishingIndex, Place, PlaceStation, Station
 from app.models.enums import StationRole
-from app.schemas.fishing_index import FishingIndexDayOut, IndexPlaceLinkOut, IndexPointOut, IndexSpeciesOut
+from app.schemas.fishing_index import (
+    FishingIndexDayOut,
+    IndexEnvOut,
+    IndexPlaceLinkOut,
+    IndexPointOut,
+    IndexSpeciesOut,
+)
 from app.services.compare import SPECIES_COMMON
 from app.services.location import location_ctx
 
@@ -24,6 +30,21 @@ DISCLAIMER = (
     "국립해양조사원이 발표한 바다낚시지수예요. 「좋음」·「보통」 등은 기관 발표 등급이며 "
     "실제 조과나 출조 안전을 보장하지 않아요. 근처 낚시터의 지수는 가까운 지점의 참고값이에요."
 )
+
+
+def _env(rows: list[FishingIndex]) -> IndexEnvOut | None:
+    """그날 이 지점에 발표된 환경 범위의 최댓값 (어종·시간대 통틀어)"""
+
+    def peak(vals):
+        vs = [v for v in vals if v is not None]
+        return max(vs) if vs else None
+
+    env = IndexEnvOut(
+        wave_max=peak(r.max_wave_m for r in rows),
+        wind_max=peak(r.max_wind_ms for r in rows),
+        temp_max=peak(r.max_water_temp for r in rows),
+    )
+    return env if any(v is not None for v in (env.wave_max, env.wind_max, env.temp_max)) else None
 
 
 def day_index(db: Session, day: date) -> FishingIndexDayOut:
@@ -75,6 +96,7 @@ def day_index(db: Session, day: date) -> FishingIndexDayOut:
                 tide_phase=dict(sorted(tide.items(), key=lambda kv: PERIOD_ORDER.get(kv[0], 9))),
                 species=[IndexSpeciesOut(species=k, grades=v) for k, v in grades.items()],
                 places=links.get(sid, []),
+                env=_env(by_station[sid]),
             )
         )
     return FishingIndexDayOut(

@@ -34,7 +34,8 @@ def _setup(ext="FI_DAY"):
             ("오후", "볼락", None),
         ]:
             db.add(FishingIndex(station_id=st.id, day=today_kst(), period=period, species=species, index=idx,
-                                tide_phase="대조기", fetched_at=now))
+                                tide_phase="대조기", fetched_at=now, max_wave_m=1.5 if period == "오후" else 0.5,
+                                max_wind_ms=12.0 if species == "감성돔" else 6.0, max_water_temp=15.2))
         db.commit()
         return st.id, official.id, near.id, far.id
 
@@ -54,6 +55,8 @@ def test_day_index_official_values_only(client):
     assert sp["어종 공통"] == {"오후": "나쁨"}
     assert "볼락" not in sp
     assert p["tide_phase"] == {"오전": "대조기", "오후": "대조기"}
+    # 왜 나쁜지 설명용 환경: 그날 발표된 값의 최댓값
+    assert p["env"] == {"wave_max": 1.5, "wind_max": 12.0, "temp_max": 15.2}
     # 공식 지점 자체 / 10km 이내 일반 낚시터(참고) / 25km 는 연결 안 함
     links = {x["place_id"]: x["official"] for x in p["places"]}
     assert links == {official: True, near: False}

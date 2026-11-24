@@ -17,10 +17,19 @@ class IndexPlaceLinkOut(BaseModel):
     official: bool
 
 
+class IndexEnvOut(BaseModel):
+    """지수와 함께 발표된 그날 지점 환경 (예측 범위의 최댓값, 2026-11-24) — 왜 나쁜지 설명용"""
+
+    wave_max: float | None = None  # m
+    wind_max: float | None = None  # m/s
+    temp_max: float | None = None  # °C
+
+
 class IndexPointOut(BaseModel):
     station_id: int
     station_name: str
     tide_phase: dict[str, str | None]  # 시간대 → 물때 (발표값)
+    env: IndexEnvOut | None = None
     species: list[IndexSpeciesOut]
     places: list[IndexPlaceLinkOut]
 
