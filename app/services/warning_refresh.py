@@ -36,7 +36,9 @@ _lock = threading.Lock()
 _done = threading.Event()
 _done.set()
 _running = False
-_last_fail = 0.0
+# monotonic 은 「부팅 뒤 초」라 막 켜진 서버에선 작다 → 0 대신 None
+# (켜진 뒤 5분간 특보 갱신이 막히던 버그, 2026-11-24)
+_last_fail: float | None = None
 _listeners: list[Callable[[], None]] = []
 
 
@@ -91,7 +93,7 @@ def maybe_refresh(
     if not needs_refresh(fetched_at) or not enabled():
         return False
     with _lock:
-        if _running or time.monotonic() - _last_fail < RETRY_AFTER_FAIL_SECONDS:
+        if _running or (_last_fail is not None and time.monotonic() - _last_fail < RETRY_AFTER_FAIL_SECONDS):
             return False
         _running = True
         _done.clear()

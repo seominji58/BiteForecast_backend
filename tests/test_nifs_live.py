@@ -73,3 +73,21 @@ def test_recent_redtide_window():
 def test_marine_issues_empty_without_keys(client):
     r = client.get("/api/v1/meta/marine-issues")
     assert r.status_code == 200 and r.json()["redtide"] == [] and r.json()["source"] == "국립수산과학원"
+
+
+def test_first_fetch_starts_right_after_boot(monkeypatch):
+    """서버가 막 켜져 monotonic 이 작아도 첫 요청에서 받기를 시작한다 (2026-11-24 운영 빈 응답 버그)"""
+    calls = []
+    monkeypatch.setattr(n, "_enabled", lambda: True)
+    monkeypatch.setattr(n, "_live", n.Live())
+    monkeypatch.setattr(n, "_last_fail", None)
+    monkeypatch.setattr(n, "_running", False)
+    monkeypatch.setattr(n.time, "monotonic", lambda: 12.0)  # 부팅 12초 뒤
+
+    def fake_fetch():
+        calls.append(1)
+        n._live = n.Live(fetched=12.0)
+
+    monkeypatch.setattr(n, "_fetch", fake_fetch)
+    n.live(wait=1)
+    assert calls == [1] and n._live.fetched == 12.0

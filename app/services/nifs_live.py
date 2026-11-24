@@ -44,13 +44,14 @@ class Live:
     stations: list[RisaStation] = field(default_factory=list)
     redtide: list[dict] = field(default_factory=list)
     jelly: list[dict] = field(default_factory=list)
-    fetched: float = 0.0
+    fetched: float | None = None  # time.monotonic() — None 이면 아직 한 번도 못 받음
 
 
 _live = Live()
 _lock = threading.Lock()
 _running = False
-_last_fail = 0.0
+# monotonic 은 「부팅 뒤 초」라 막 켜진 서버에선 작다 → 0 이 아니라 None 으로 「없음」을 나타낸다
+_last_fail: float | None = None
 _done = threading.Event()
 _done.set()
 
@@ -152,14 +153,15 @@ def live(wait: float = 3.0) -> Live:
         return _live
     now = time.monotonic()
     with _lock:
-        stale = now - _live.fetched > REFRESH_SECONDS
-        start = stale and not _running and now - _last_fail > RETRY_AFTER_FAIL_SECONDS
+        stale = _live.fetched is None or now - _live.fetched > REFRESH_SECONDS
+        cooled = _last_fail is None or now - _last_fail > RETRY_AFTER_FAIL_SECONDS
+        start = stale and not _running and cooled
         if start:
             _running = True
             _done.clear()
     if start:
         threading.Thread(target=_run, name="nifs-live", daemon=True).start()
-    if _live.fetched == 0 and wait:
+    if _live.fetched is None and wait:
         _done.wait(wait)
     return _live
 
