@@ -182,3 +182,11 @@ def test_no_key_counts_but_sends_nothing(client, monkeypatch):
     with SessionLocal() as db:
         stats = push.run(db, evening)
     assert stats.get("fav_good_due", 0) >= 1 and called == []
+
+
+def test_legal_pages(client):
+    for path, title in (("/privacy", "개인정보 처리방침"), ("/terms", "이용약관")):
+        r = client.get(path)
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+        assert title in r.text and "biteforecast@outlook.kr" in r.text
+    assert "국외 이전" in client.get("/privacy").text

@@ -22,6 +22,7 @@ from app.routers import (
     geo,
     health,
     journals,
+    legal,
     marine_issues,
     me,
     nearby,
@@ -148,3 +149,5 @@ app.include_router(rock_points.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(marine_issues.router, prefix=API_PREFIX)
 app.include_router(push.router, prefix=API_PREFIX)
+# 개인정보 처리방침·이용약관 웹 페이지 (원스토어 등록 주소: https://biteforecast-api.fly.dev/privacy)
+app.include_router(legal.router)
