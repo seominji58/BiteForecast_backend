@@ -11,3 +11,7 @@ uploads/
 backups/
 media/
 runtime/
+
+# Firebase 서비스 계정 키 (비밀)
+*firebase-adminsdk*.json
+firebase-service-account*.json

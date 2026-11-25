@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     nifs_redtide_key: str = ""
     nifs_jelly_key: str = ""
     data_go_kr_api_key: str = ""
+    # 푸시 알림(FCM): Firebase 서비스 계정 키 — 파일 경로 또는 JSON 내용 그대로 (운영은 Fly secret)
+    # 비어 있으면 알림을 보내지 않는다
+    firebase_service_account: str = ""
     kma_api_key: str = ""
     # 경기데이터드림(openapi.gg.go.kr) 인증키 — 경기도 낚시어선업 현황 등. 서버에서만 사용
     gyeonggi_data_api_key: str = ""

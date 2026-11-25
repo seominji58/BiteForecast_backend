@@ -49,6 +49,7 @@ from app.models import (
 )
 from app.models.base import utcnow
 from app.models.enums import DataKind, Metric, StationRole
+from app.services import push
 from app.services.envlink import link_environment
 from app.services.freshness import data_status
 from app.services.warning_refresh import store_snapshot
@@ -131,6 +132,14 @@ def collect_once(client: KmaForecastClient | None = None) -> Counter:
                 link_environment(db, j)
             stats["journals_relinked"] += len(journals)
             db.commit()
+
+            # 푸시 알림 (즐겨찾기 좋음·출조 날 특보·이번 주 좋은 날). 실패해도 수집 결과는 그대로 둔다
+            try:
+                stats.update({f"push_{k}": v for k, v in push.run(db).items()})
+            except Exception:
+                db.rollback()
+                log.exception("푸시 알림 실패")
+                stats["push_failed"] += 1
     finally:
         if own_client:
             client.close()
