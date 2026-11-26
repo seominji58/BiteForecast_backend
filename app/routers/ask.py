@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUser, DbSession
+from app.core.config import get_settings
 from app.models import Place
 from app.services import ask as svc
 from app.services import fish_id
@@ -41,12 +42,13 @@ class AskStatus(BaseModel):
 
 @router.get("/status", response_model=AskStatus)
 def status(user: CurrentUser):
-    return AskStatus(enabled=fish_id.enabled(), remaining=svc.remaining(user.id))
+    on = get_settings().ask_enabled and fish_id.enabled()
+    return AskStatus(enabled=on, remaining=svc.remaining(user.id))
 
 
 @router.post("", response_model=AskOut)
 def ask(body: AskIn, user: CurrentUser, db: DbSession):
-    if not fish_id.enabled():
+    if not (get_settings().ask_enabled and fish_id.enabled()):
         raise HTTPException(status_code=503, detail="입질예보에게 묻기가 아직 준비 중이에요")
     if body.messages[-1].role != "user":
         raise HTTPException(status_code=400, detail="마지막은 질문이어야 해요")

@@ -37,7 +37,8 @@ class Settings(BaseSettings):
     # 비용 보호: 사용자당 하루 몇 번 · 서버 전체 하루 몇 번 (한국 시간 자정에 초기화)
     fish_id_daily_per_user: int = 10
     fish_id_daily_total: int = 500
-    # 입질예보에게 묻기 (2026-11-26)
+    # 입질예보에게 묻기 (2026-11-26). 비용·품질 문제 때는 Fly secret ASK_ENABLED=false 로 바로 끈다
+    ask_enabled: bool = True
     ask_daily_per_user: int = 20
     ask_daily_total: int = 1000
     kma_api_key: str = ""
