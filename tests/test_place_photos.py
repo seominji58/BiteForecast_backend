@@ -27,3 +27,17 @@ def test_real_file_loads():
     place_photos._data.cache_clear()
     data = place_photos._data()
     assert all(v["images"] and v["images"][0]["url"].startswith("https://") for v in data.values())
+
+
+def test_place_notices(client):
+    """시드에 있는 곳은 안내 목록, 없는 곳은 빈 목록. 시군 통제구역은 목록 원문을 같이 준다"""
+    import json
+    from pathlib import Path
+
+    d = json.loads((Path(__file__).resolve().parent.parent / "seeds" / "place_notices.json").read_text())
+    pid, notes = next((k, v) for k, v in d["places"].items() if any(n["kind"] == "zone" for n in v))
+    r = client.get(f"/api/v1/places/{pid}/notices").json()
+    zone = next(n for n in r if n["kind"] == "zone")
+    assert zone["zone_items"] and zone["source_url"].startswith("https://www.data.go.kr/")
+    assert all("가능" not in n["title"] for n in r)
+    assert client.get("/api/v1/places/999999/notices").json() == []

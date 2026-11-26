@@ -22,3 +22,5 @@ ops/
 # Firebase 서비스 계정 키는 이미지에 넣지 않음 (운영은 Fly secret 으로 전달)
 *firebase-adminsdk*.json
 firebase-service-account*.json
+# 공공데이터 원본 (seeds 만들 때만 씀)
+data/

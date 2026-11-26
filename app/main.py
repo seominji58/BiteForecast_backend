@@ -30,6 +30,7 @@ from app.routers import (
     photos,
     place_kakao,
     place_map,
+    place_notices,
     place_photos,
     places,
     push,
@@ -145,6 +146,7 @@ app.include_router(geo.router, prefix=API_PREFIX)
 app.include_router(nearby.router, prefix=API_PREFIX)
 app.include_router(place_map.router, prefix=API_PREFIX)
 app.include_router(place_photos.router, prefix=API_PREFIX)
+app.include_router(place_notices.router, prefix=API_PREFIX)
 app.include_router(place_kakao.router, prefix=API_PREFIX)
 app.include_router(rock_points.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
