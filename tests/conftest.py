@@ -8,6 +8,7 @@ os.environ["GOOGLE_CLIENT_IDS"] = ""
 os.environ["KAKAO_NATIVE_APP_KEY"] = ""
 # 테스트에서 실제 푸시 알림이 나가지 않게
 os.environ["FIREBASE_SERVICE_ACCOUNT"] = ""
+os.environ["OPENAI_API_KEY"] = ""
 os.environ["APP_ENV"] = "test"
 os.environ["ADMIN_TOKEN"] = "test-admin-token"
 os.environ["MEDIA_DIR"] = tempfile.mkdtemp(prefix="bf-media-")

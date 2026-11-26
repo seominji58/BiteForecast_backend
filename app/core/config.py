@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     # 푸시 알림(FCM): Firebase 서비스 계정 키 — 파일 경로 또는 JSON 내용 그대로 (운영은 Fly secret)
     # 비어 있으면 알림을 보내지 않는다
     firebase_service_account: str = ""
+    # 사진으로 어종 찾기 (OpenAI, 2026-11-26). 키는 서버에만. 비어 있으면 기능 꺼짐
+    openai_api_key: str = ""
+    openai_model: str = "gpt-5.4-mini"  # 2026-11-26 사진 5장 비교: 광어·도다리 구별까지 맞힘
+    # 비용 보호: 사용자당 하루 몇 번 · 서버 전체 하루 몇 번 (한국 시간 자정에 초기화)
+    fish_id_daily_per_user: int = 10
+    fish_id_daily_total: int = 500
     kma_api_key: str = ""
     # 경기데이터드림(openapi.gg.go.kr) 인증키 — 경기도 낚시어선업 현황 등. 서버에서만 사용
     gyeonggi_data_api_key: str = ""
