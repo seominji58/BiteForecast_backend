@@ -16,6 +16,7 @@ URL = "/api/v1/ask"
 def ai(monkeypatch):
     s = get_settings()
     monkeypatch.setattr(s, "openai_api_key", "test-key")
+    monkeypatch.setattr(s, "ask_enabled", True)
     monkeypatch.setattr(s, "ask_daily_per_user", 2)
     monkeypatch.setattr(svc, "_quota", svc._Quota())
     sent = []
@@ -78,3 +79,11 @@ def test_quota_and_last_must_be_user(client, device, ai):
 def test_rules_tool_no_rule_species():
     out = svc.tool_fishing_rules("전갱이")
     assert not out["bans"] and not out["sizes"] and "없음" in out["note"]
+
+
+def test_off_by_default(client, device, monkeypatch):
+    """OpenAI 키가 있어도 ask_enabled 가 꺼져 있으면 쓰지 않는다 (어종 찾기만 OpenAI)"""
+    monkeypatch.setattr(get_settings(), "openai_api_key", "test-key")
+    assert client.get(f"{URL}/status", headers=device).json()["enabled"] is False
+    q = {"messages": [{"role": "user", "content": "a"}]}
+    assert client.post(URL, json=q, headers=device).status_code == 503

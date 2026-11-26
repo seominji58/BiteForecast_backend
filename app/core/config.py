@@ -37,7 +37,9 @@ class Settings(BaseSettings):
     # 비용 보호: 사용자당 하루 몇 번 · 서버 전체 하루 몇 번 (한국 시간 자정에 초기화)
     fish_id_daily_per_user: int = 10
     fish_id_daily_total: int = 500
-    # 입질예보에게 묻기 (2026-11-26)
+    # 입질예보에게 묻기 (2026-11-26). OpenAI 는 사진 어종 찾기에만 쓰기로 해 기본 꺼짐
+    # (규칙 기반 도우미로 바꿀 예정)
+    ask_enabled: bool = False
     ask_daily_per_user: int = 20
     ask_daily_total: int = 1000
     kma_api_key: str = ""
