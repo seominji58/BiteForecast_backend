@@ -119,3 +119,19 @@ def test_rejections_are_korean(client, places):
         )
     )
     assert "닉네임" in msg
+
+
+def test_title_rule_two_chars_or_one_emoji(client):
+    """일반 글자는 2자 이상, 이모티콘은 하나만 있어도 된다"""
+    h = signup(client)
+
+    def post(title):
+        return client.post(
+            "/api/v1/community/posts", json={"category": "free", "title": title, "body": "본문"}, headers=h
+        )
+
+    for ok in ("🎣", "🇰🇷", "👨‍👩‍👧", "대박", "ab", "🐟🐟"):
+        assert post(ok).status_code == 201, ok
+    for bad in ("가", "a", "1"):
+        msg = _ko_error(post(bad))
+        assert "2자" in msg

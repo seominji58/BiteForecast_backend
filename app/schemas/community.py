@@ -11,6 +11,30 @@ def _strip(v):
     return v.strip() if isinstance(v, str) else v
 
 
+def _is_emoji_only(s: str) -> bool:
+    """이모티콘만으로 된 문자열 (🎣 · 👨‍👩‍👧 · 🇰🇷 등). 이모지·합자·국기·이체 선택자 범위로 판단"""
+    if not s:
+        return False
+    for ch in s:
+        o = ord(ch)
+        if not (
+            0x1F000 <= o <= 0x1FAFF  # 이모지·그림 문자
+            or 0x2600 <= o <= 0x27BF  # 기타 기호·딩뱃
+            or 0x1F1E6 <= o <= 0x1F1FF  # 국기 글자
+            or o in (0x200D, 0xFE0F, 0x20E3)  # 합자·이모지 표시·키캡
+            or 0x1F3FB <= o <= 0x1F3FF  # 피부색
+        ):
+            return False
+    return True
+
+
+def check_title(v):
+    """제목: 일반 글자는 2자 이상, 이모티콘은 하나만 있어도 된다 (2026-11-26 사용자 결정)"""
+    if isinstance(v, str) and len(v) < 2 and not _is_emoji_only(v):
+        raise ValueError("제목은 2자 이상 입력해 주세요 (이모티콘은 하나만 있어도 돼요)")
+    return v
+
+
 class AuthorOut(BaseModel):
     nickname: str  # 계정 닉네임. 계정 없는 예전 기기 사용자는 「이전 사용자」
     title: str  # 현재 칭호
@@ -35,6 +59,7 @@ class PostIn(BaseModel):
     show_tackle: bool = True
 
     _s = field_validator("title", "body", mode="before")(_strip)
+    _t = field_validator("title")(check_title)
 
     @field_validator("species_code", "species_etc", mode="before")
     @classmethod
@@ -158,6 +183,7 @@ class PostEdit(BaseModel):
     show_tackle: bool | None = None
 
     _s = field_validator("title", "body", mode="before")(_strip)
+    _t = field_validator("title")(check_title)
 
 
 class CatchSummaryOut(BaseModel):
