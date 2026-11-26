@@ -3,7 +3,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, Integer
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, UTCDateTime
@@ -14,7 +14,9 @@ class ChallengeVisit(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("app_user.id", ondelete="CASCADE"), index=True)
-    place_id: Mapped[int] = mapped_column(ForeignKey("place.id"), index=True)
+    # 낚시공원 시즌은 place_id, 배낚시 항구 시즌은 port_key(「항구이름|시군」) — 둘 중 하나
+    place_id: Mapped[int | None] = mapped_column(ForeignKey("place.id"), index=True)
+    port_key: Mapped[str | None] = mapped_column(String(80), index=True)
     season: Mapped[int] = mapped_column(Integer, default=1)
     visited_at: Mapped[datetime] = mapped_column(UTCDateTime())
     within_m: Mapped[int] = mapped_column(Integer)  # 100 또는 300 (정확한 거리는 저장 안 함)

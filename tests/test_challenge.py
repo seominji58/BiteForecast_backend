@@ -91,3 +91,65 @@ def test_season_file_points_to_real_places():
     ids = [x["place_id"] for x in s["spots"]]
     assert len(ids) == len(set(ids)) == 17
     assert {x["sea"] for x in s["spots"]} <= {"동해", "서해", "남해", "제주"}
+
+
+# --- 배낚시 항구 시즌 ---
+@pytest.fixture()
+def port(monkeypatch):
+    data = {
+        "season": 2,
+        "title": "배낚시 항구",
+        "radius_m": 500,
+        "points": 20,
+        "spots": [
+            {
+                "key": "테스트항|전남광주통합특별시 여수시",
+                "name": "테스트항",
+                "sgg": "전남광주통합특별시 여수시",
+                "region": "전남 여수시",
+                "sea": "남해",
+                "lat": 34.72,
+                "lon": 127.72,
+                "boats": 10,
+                "max_passengers": 20,
+                "kakao_url": None,
+                "note": "항구 안 낚시 금지",
+            }
+        ],
+    }
+    monkeypatch.setattr(mod, "port_season", lambda: data)
+    seen = []
+
+    def ev(db, place, *a, **k):
+        seen.append(place)
+        return SimpleNamespace(level="none")
+
+    monkeypatch.setattr(warning, "evaluate", ev)
+    # 새벽 5시(KST)도 찍을 수 있다 — 배낚시는 새벽 출항
+    monkeypatch.setattr(mod, "utcnow", lambda: datetime(2026, 11, 25, 20, 0, tzinfo=UTC))
+    return SimpleNamespace(key=data["spots"][0]["key"], seen=seen)
+
+
+def test_port_visit(client, device, port):
+    near = {"key": port.key, "lat": 34.7235, "lon": 127.7203}  # 약 400m
+    r = client.post("/api/v1/challenge-ports/visit", json=near, headers=device)
+    assert r.status_code == 200, r.text
+    assert r.json()["first"] is True and r.json()["points"] == 20 and r.json()["total"] == 1
+    # 특보 판정은 배낚시 기준(boat)으로
+    assert str(port.seen[0].type) == "boat" and port.seen[0].region_name == "전남 여수시"
+    assert (
+        client.post("/api/v1/challenge-ports/visit", json=near, headers=device).status_code == 409
+    )  # 하루 1번
+    far = {"key": port.key, "lat": 34.75, "lon": 127.72}
+    assert client.post("/api/v1/challenge-ports/visit", json=far, headers=device).status_code == 409
+    bad = {"key": "없는항|x", "lat": 34.72, "lon": 127.72}
+    assert client.post("/api/v1/challenge-ports/visit", json=bad, headers=device).status_code == 404
+    s = client.get("/api/v1/challenge-ports", headers=device).json()
+    assert s["visited"] == 1 and s["spots"][0]["note"] == "항구 안 낚시 금지"
+
+
+def test_port_season_file():
+    s = mod.port_season()
+    keys = [x["key"] for x in s["spots"]]
+    assert len(keys) == len(set(keys)) == 20 and s["radius_m"] == 500
+    assert any(x["name"] == "장고항" and x["note"] for x in s["spots"])

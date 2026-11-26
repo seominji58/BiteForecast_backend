@@ -10,6 +10,7 @@
 - 기록·글·댓글을 지우면 없어진 이벤트는 음수 행으로 회수된다
 """
 
+import hashlib
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
@@ -100,6 +101,10 @@ def capped_events(reason: PointReason, items: list[tuple[int, object]]) -> dict[
     return out
 
 
+def port_ref(port_key: str) -> str:
+    return hashlib.sha1(port_key.encode()).hexdigest()[:16]
+
+
 def recompute_points(db: Session, user: AppUser) -> int:
     """원장을 기대 상태에 맞춘다. 반환값 = 이번에 추가된 증감 합계 (flush 만 하고 commit 은 호출자가 한다)"""
     db.flush()  # 세션이 autoflush=False 라서, 방금 바꾼 인증 상태·삭제를 조회에 반영
@@ -116,10 +121,14 @@ def recompute_points(db: Session, user: AppUser) -> int:
     expected.update(capped_events(PointReason.POST_CREATED, [tuple(r) for r in posts]))
     expected.update(capped_events(PointReason.COMMENT_CREATED, [tuple(r) for r in comments]))
     # 탐험 도장: 장소마다 처음 방문 한 번 (2026-11-26)
-    for (place_id,) in db.execute(
-        select(ChallengeVisit.place_id).where(ChallengeVisit.user_id == user.id).distinct()
+    for place_id, port_key in db.execute(
+        select(ChallengeVisit.place_id, ChallengeVisit.port_key)
+        .where(ChallengeVisit.user_id == user.id)
+        .distinct()
     ).all():
-        expected[(PointReason.CHALLENGE_VISIT, f"challenge:{place_id}")] = ExpectedEvent(
+        # 항구 키(「이름|시군」)는 길 수 있어 짧은 해시로 (원장 ref_key 64자)
+        ref = f"challenge:{place_id}" if place_id is not None else "challenge-port:" + port_ref(port_key)
+        expected[(PointReason.CHALLENGE_VISIT, ref)] = ExpectedEvent(
             POINTS[PointReason.CHALLENGE_VISIT], None
         )
 
