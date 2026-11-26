@@ -1,5 +1,5 @@
 {
- "_note": "탐험 시즌 1 — 공식 바다낚시공원·해상낚시터 (2026-11-26). place_id 는 운영 DB 낚시터 id. 운영 정보(info)는 누리집 확인 결과로 채운다",
+ "_note": "탐험 시즌 1 — 공식 바다낚시공원·해상낚시터 (2026-11-26). place_id 는 운영 DB 낚시터 id. 운영 정보(info)는 누리집 확인 결과로 채운다. 2026-11-26 운영 정보: 한국관광공사 관광정보·전국낚시터정보표준데이터 기준(2차 확인), 지세포 낚시공원은 시설 확인 안 돼 제외",
  "season": 1,
  "title": "시즌 1 · 바다낚시공원",
  "radius_m": 300,
@@ -10,126 +10,289 @@
    "name": "선재낚시공원",
    "region": "인천 옹진군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "입어료 일반 110,000원~ (출처별 상이, 미확정)",
+    "hours": "상시 개방",
+    "closed": "연중무휴",
+    "reservation": null,
+    "phone": "032-710-4340",
+    "url": "https://www.instagram.com/sunjae_fishing/",
+    "note": "방갈로·펜션 있음(미확인). 선재로265번길 '선재낚시터'와 별개 업장.",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 244,
    "name": "영흥바다낚시터",
    "region": "인천 옹진군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 여부 확인 중",
+    "fee": "20시간 남성 77,000원 20시간 여성 55,000원 (2020년 공공데이터)",
+    "hours": null,
+    "closed": null,
+    "reservation": null,
+    "phone": null,
+    "url": null,
+    "note": "최근 자료 없음",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 245,
    "name": "용담바다낚시터",
    "region": "인천 옹진군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 여부 확인 중",
+    "fee": "12시간 60,000원 (2020년 공공데이터)",
+    "hours": null,
+    "closed": null,
+    "reservation": null,
+    "phone": null,
+    "url": null,
+    "note": "최근 자료 없음",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 237,
    "name": "선두바다낚시터",
    "region": "인천 강화군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 여부 확인 중",
+    "fee": "60,000원 (시간 기준 표기 없음, 공공데이터 2026-06-01)",
+    "hours": null,
+    "closed": null,
+    "reservation": null,
+    "phone": null,
+    "url": null,
+    "note": "최근 자료 부족",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 238,
    "name": "강화도 황청낚시터",
    "region": "인천 강화군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "프로그램에 따라 상이 (공공데이터 30,000원)",
+    "hours": "08:00~22:00",
+    "closed": "한파 시 낚시터가 얼 경우 단기 휴장",
+    "reservation": null,
+    "phone": "010-3459-2266",
+    "url": "http://hwangcheongfish.com",
+    "note": "장비 대여 5,000원, 수상좌대 별도 요금",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 240,
    "name": "황산초지바다낚시터",
    "region": "인천 강화군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "12시간 남성 80,000원, 여성 70,000원 (출처별 상이)",
+    "hours": "상시 개방",
+    "closed": "연중무휴",
+    "reservation": null,
+    "phone": "032-937-5100",
+    "url": "http://cafe.naver.com/brownh9mvl",
+    "note": "사계절 낚시터, 무료 주차",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 242,
    "name": "소래바다낚시터",
    "region": "인천 남동구",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "입어료 40,000원",
+    "hours": "매일 07:30~18:00",
+    "closed": "연중무휴",
+    "reservation": null,
+    "phone": "010-5356-3939",
+    "url": "http://cafe.naver.com/purples77nw",
+    "note": null,
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 212,
    "name": "갈음이 해상낚시공원",
    "region": "충남 태안군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 여부 확인 중",
+    "fee": "100,000원 (단위 미표기)",
+    "hours": null,
+    "closed": null,
+    "reservation": null,
+    "phone": null,
+    "url": null,
+    "note": "해상펜션 숙박형으로 보여요",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 249,
    "name": "안면도 라암도 해상낚시공원",
    "region": "충남 태안군",
    "sea": "서해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "낚시대 대여 15,000원 / 선상낚시체험 50,000원 (숙박 요금 미확인)",
+    "hours": "선상체험 08:00~12:00 / 13:00~17:00",
+    "closed": "연중무휴 (기상상황에 따라 변동)",
+    "reservation": "배로 들어가요 · 예약 확인 필요",
+    "phone": "010-3276-1532",
+    "url": "http://www.sea-fishing.co.kr/",
+    "note": "해상펜션형",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 175,
    "name": "원산도 선촌 해양낚시터",
    "region": "충남 보령시",
    "sea": "서해",
-   "info": null
-  },
-  {
-   "place_id": 235,
-   "name": "지세포 낚시공원",
-   "region": "경남 거제시",
-   "sea": "남해",
-   "info": null
+   "info": {
+    "status": "운영 여부 확인 중",
+    "fee": "1일 25,000원 (공공데이터)",
+    "hours": null,
+    "closed": null,
+    "reservation": null,
+    "phone": null,
+    "url": null,
+    "note": null,
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 91,
    "name": "통영등대낚시공원",
    "region": "경남 통영시",
    "sea": "남해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "입장료 성인 1,000원 + 낚시 성인 20,000원",
+    "hours": "05:30~17:30",
+    "closed": "매주 월요일 (자료에 따라 일요일)",
+    "reservation": null,
+    "phone": "010-7487-3312",
+    "url": "https://blog.naver.com/soloveme1107",
+    "note": "주소는 산양읍 삼칭이해안길 441로도 안내돼요",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 133,
    "name": "돌산해양낚시공원낚시터",
    "region": "전남 여수시",
    "sea": "남해",
-   "info": null
+   "info": {
+    "status": "운영 여부 확인 중",
+    "fee": "4인 150,000원 (1인 요금 미확인)",
+    "hours": null,
+    "closed": null,
+    "reservation": null,
+    "phone": null,
+    "url": null,
+    "note": null,
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 117,
    "name": "거금해양낚시공원",
    "region": "전남 고흥군",
    "sea": "남해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "부잔교 낚시터 성인 1회 20,000원",
+    "hours": "06:30~17:30",
+    "closed": "12월 1일~3월 31일 동절기 휴장, 태풍·강풍 시 중단",
+    "reservation": null,
+    "phone": "061-843-5010",
+    "url": "http://ggdofishingpark.com",
+    "note": "겨울(12~3월)엔 문을 닫아요",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 247,
    "name": "득량만바다낚시공원",
    "region": "전남 보성군",
    "sea": "남해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "입장료 성인 2,000원 / 입어료 성인 20,000원",
+    "hours": "06:00~18:00",
+    "closed": "매주 월요일",
+    "reservation": null,
+    "phone": "010-4641-6395",
+    "url": null,
+    "note": null,
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 138,
    "name": "정남진 해양낚시공원",
    "region": "전남 장흥군",
    "sea": "남해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "당일이용 성인 20,000원",
+    "hours": "상시 개방",
+    "closed": "연중무휴",
+    "reservation": null,
+    "phone": "061-867-0555",
+    "url": "http://www.jangheung.go.kr/tour",
+    "note": null,
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 116,
    "name": "가우도 복합낚시공원",
    "region": "전남 강진군",
    "sea": "남해",
-   "info": null
+   "info": {
+    "status": "운영 여부 확인 중",
+    "fee": "성인 10,000원 (2023년 공공데이터)",
+    "hours": null,
+    "closed": null,
+    "reservation": null,
+    "phone": "061-430-3349",
+    "url": "https://www.gangjin.go.kr/culture",
+    "note": "어촌계 위탁 운영이라 해마다 달라질 수 있어요 (전화는 강진군 문화관광과)",
+    "checked_at": "2026-11-26"
+   }
   },
   {
    "place_id": 110,
    "name": "당사해양낚시공원",
    "region": "울산 북구",
    "sea": "동해",
-   "info": null
+   "info": {
+    "status": "운영 중 (관광정보 기준)",
+    "fee": "입장료 성인 1,000원 + 낚시 성인 10,000원",
+    "hours": "동절기(11~3월) 09:00~16:00, 하절기 09:00~18:00 · 낚시객 06:30~20:00 탄력 운영",
+    "closed": "연중무휴",
+    "reservation": null,
+    "phone": "052-282-1116",
+    "url": null,
+    "note": null,
+    "checked_at": "2026-11-26"
+   }
   }
  ]
 }

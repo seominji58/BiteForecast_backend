@@ -14,6 +14,7 @@ from app.core.db import init_db
 from app.routers import (
     admin,
     amenities,
+    ask,
     auth,
     boat_ports,
     challenge,
@@ -155,5 +156,6 @@ app.include_router(marine_issues.router, prefix=API_PREFIX)
 app.include_router(push.router, prefix=API_PREFIX)
 app.include_router(fish_id.router, prefix=API_PREFIX)
 app.include_router(challenge.router, prefix=API_PREFIX)
+app.include_router(ask.router, prefix=API_PREFIX)
 # 개인정보 처리방침·이용약관 웹 페이지 (원스토어 등록 주소: https://biteforecast-api.fly.dev/privacy)
 app.include_router(legal.router)

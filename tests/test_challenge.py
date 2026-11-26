@@ -89,5 +89,5 @@ def test_season_file_points_to_real_places():
     """시즌 파일: 18곳, 바다 구분, place_id 중복 없음"""
     s = mod.season.__wrapped__() if hasattr(mod.season, "__wrapped__") else mod.season()
     ids = [x["place_id"] for x in s["spots"]]
-    assert len(ids) == len(set(ids)) == 18
+    assert len(ids) == len(set(ids)) == 17
     assert {x["sea"] for x in s["spots"]} <= {"동해", "서해", "남해", "제주"}

@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # 비용 보호: 사용자당 하루 몇 번 · 서버 전체 하루 몇 번 (한국 시간 자정에 초기화)
     fish_id_daily_per_user: int = 10
     fish_id_daily_total: int = 500
+    # 입질예보에게 묻기 (2026-11-26)
+    ask_daily_per_user: int = 20
+    ask_daily_total: int = 1000
     kma_api_key: str = ""
     # 경기데이터드림(openapi.gg.go.kr) 인증키 — 경기도 낚시어선업 현황 등. 서버에서만 사용
     gyeonggi_data_api_key: str = ""
