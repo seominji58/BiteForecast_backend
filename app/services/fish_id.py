@@ -11,6 +11,7 @@ import base64
 import io
 import json
 import logging
+import re
 import threading
 from dataclasses import dataclass, field
 
@@ -143,19 +144,38 @@ SCHEMA = {
 
 
 def _prompt(species: list[tuple[str, str]]) -> str:
-    listing = ", ".join(f"{code}={name}" for code, name in species)
+    """우리 목록에서 고르게 하면 민물고기도 바다 어종으로 끼워 맞췄다 (2026-11-26 납지리 → 숭어·참돔).
+    → 목록은 「흔한 어종」 참고로만 주고, 이름을 자유롭게 말하게 한 뒤 서버가 이름으로 목록과 맞춘다 (match_code)"""
+    common = ", ".join(_base(n) for _, n in species)
     return (
-        "당신은 한국 바다낚시 어종 판별을 돕는 도우미입니다.\n"
-        "사진 속 생물이 무엇인지 후보를 최대 3개 고르세요.\n"
-        "- 가능하면 아래 목록에서 고르고 code 를 적으세요.\n"
-        "- 목록에 없으면 code 는 null, name 에 한국어 이름을 적으세요.\n"
-        "- 가장 가능성 높은 후보부터. 확실하지 않으면 confidence 를 낮추세요. 지어내지 마세요.\n"
-        "- 넙치류는 배를 아래로 두고 볼 때 두 눈이 왼쪽이면 광어(넙치), 오른쪽이면 가자미·도다리(좌광우도).\n"
-        "  광어는 입이 크고 이빨이 날카로우며, 가자미·도다리는 입이 작다. 이 특징을 먼저 확인하세요.\n"
-        "- 먹어도 되는지, 독이 있는지, 요리법은 절대 언급하지 마세요.\n"
-        "- 물고기 등이 보이지 않으면 is_fish=false, candidates 는 빈 배열.\n"
-        f"어종 목록: {listing}"
+        "당신은 한국 낚시 어종 판별 도우미입니다. 사진 속 생물의 후보를 최대 3개, 가능성 높은 순으로 고르세요.\n"
+        "- 먼저 바다고기인지 민물고기인지 몸 모양·비늘·지느러미·수염·입 위치로 판단하세요.\n"
+        "- name 에는 한국에서 쓰는 표준 이름을 적고, 민물고기면 이름 뒤에 '(민물)'을 붙이세요. code 는 항상 null 로 두세요.\n"
+        f"- 참고로 한국 바다낚시에서 흔한 어종은 {common} 등이에요. 이 중 하나로 보이면 그 이름을 쓰되, 아니면 억지로 맞추지 마세요.\n"
+        "- 닮은 어종 구별: 우럭(조피볼락: 머리가 크고 몸이 두툼, 짙은 회갈색, 눈 뒤로 검은 줄) vs 농어(몸이 길고 은백색) vs 볼락(작고 눈이 큼). "
+        "붕어(몸이 두툼, 비늘이 큼) vs 납자루·납지리류(작고 납작·높은 몸, 옆면이 반짝임) vs 잉어(입수염 2쌍). "
+        "광어(눈이 왼쪽) vs 가자미·도다리(눈이 오른쪽). 감성돔(검은 회색) vs 참돔(붉은색). "
+        "복어류(둥근 몸, 비늘 없음, 작은 입·이빨판) vs 쥐치(납작, 등에 가시 하나).\n"
+        "- 확실하지 않으면 confidence 를 낮추고 닮은 어종을 함께 후보로 넣으세요. 지어내지 마세요.\n"
+        "- 먹어도 되는지·독·요리법은 언급하지 마세요. 물고기 등이 보이지 않으면 is_fish=false."
     )
+
+
+def _base(name: str) -> str:
+    """「우럭(조피볼락)」 → 「우럭」, 「붕어 (민물)」 → 「붕어」"""
+    return re.sub(r"\s*\(.*?\)\s*", "", name).strip()
+
+
+def match_code(name: str, species: list[tuple[str, str]]) -> tuple[str | None, str | None]:
+    """AI 가 말한 이름을 우리 목록 어종과 맞춘다 (이름·괄호 속 다른 이름). 민물이면 맞추지 않는다. (code, 목록 이름)"""
+    if "민물" in name:
+        return None, None
+    want = {_base(name), *re.findall(r"\((.*?)\)", name)}
+    for code, n in species:
+        names = {_base(n), *re.findall(r"\((.*?)\)", n)}
+        if want & names:
+            return code, n
+    return None, None
 
 
 def _client() -> httpx.Client:
@@ -214,11 +234,10 @@ def identify(jpeg: bytes, species: list[tuple[str, str]], http: httpx.Client | N
         out = json.loads(text or "")
     except ValueError:
         raise FishIdError(503, "AI 답을 읽지 못했어요. 다시 시도해 주세요") from None
-    # 목록에 없는 code 는 지운다 (AI 가 만들어 낸 code 로 어종을 저장하지 않게)
-    valid = {code: name for code, name in species}
+    # 이름으로 우리 목록과 맞춘다. AI 가 낸 code 는 쓰지 않는다 (지어낸 code 로 저장되지 않게)
     for c in out.get("candidates", []):
-        if c.get("code") not in valid:
-            c["code"] = None
-        else:
-            c["name"] = valid[c["code"]]
+        code, listed = match_code(c.get("name", ""), species)
+        c["code"] = code
+        if listed:
+            c["name"] = listed
     return out

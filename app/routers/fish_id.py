@@ -18,6 +18,12 @@ NOTICE = (
 )
 
 
+def is_puffer(name: str) -> bool:
+    """복어류 (자주복·참복·까치복·졸복·복섬 등). 전복은 조개라 제외"""
+    base = name.split("(")[0].strip()
+    return "복어" in name or "복섬" in name or (base.endswith("복") and base not in ("전복", "까막전복"))
+
+
 class CandidateOut(BaseModel):
     code: str | None
     name: str
@@ -59,10 +65,14 @@ async def identify(user: CurrentUser, db: DbSession, file: Annotated[UploadFile,
     except svc.FishIdError as e:
         svc.give_back(user.id)
         raise HTTPException(status_code=e.status, detail=e.message) from None
+    cands = [CandidateOut(**c) for c in out.get("candidates", [])[:3]]
+    notice = NOTICE
+    if any(is_puffer(c.name) for c in cands):
+        notice = "⚠ 복어류는 독이 있어요. 절대 먹지 말고 바로 놓아주세요. " + NOTICE
     return FishIdOut(
         is_fish=bool(out.get("is_fish")),
-        candidates=[CandidateOut(**c) for c in out.get("candidates", [])[:3]],
+        candidates=cands,
         photo_tip=out.get("photo_tip"),
-        notice=NOTICE,
+        notice=notice,
         remaining=left,
     )

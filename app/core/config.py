@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     firebase_service_account: str = ""
     # 사진으로 어종 찾기 (OpenAI, 2026-11-26). 키는 서버에만. 비어 있으면 기능 꺼짐
     openai_api_key: str = ""
-    openai_model: str = "gpt-5.4-mini"  # 2026-11-26 사진 5장 비교: 광어·도다리 구별까지 맞힘
+    # 2026-11-26 사진 9장 비교(바다·민물·복어): gpt-5.5 9/9, gpt-5.4-mini 6/9 (복어→쥐치 오답) — 속도는 같음
+    openai_model: str = "gpt-5.5"
     # 비용 보호: 사용자당 하루 몇 번 · 서버 전체 하루 몇 번 (한국 시간 자정에 초기화)
     fish_id_daily_per_user: int = 10
     fish_id_daily_total: int = 500
