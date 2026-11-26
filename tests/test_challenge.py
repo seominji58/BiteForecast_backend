@@ -153,3 +153,20 @@ def test_port_season_file():
     keys = [x["key"] for x in s["spots"]]
     assert len(keys) == len(set(keys)) == 20 and s["radius_m"] == 500
     assert any(x["name"] == "장고항" and x["note"] for x in s["spots"])
+
+
+def test_visit_without_location(client, device, spot):
+    """새 앱: 거리는 폰에서 재고 구간(within_m)만 보낸다 — 좌표 없이 도장"""
+    r = client.post(f"{URL}/{spot}/visit", json={"within_m": 500}, headers=device)
+    assert r.status_code == 409  # 낚시공원 반경 300m 밖
+    r = client.post(f"{URL}/{spot}/visit", json={"within_m": 300}, headers=device)
+    assert r.status_code == 200, r.text
+    with SessionLocal() as db:
+        assert db.query(ChallengeVisit).filter(ChallengeVisit.place_id == spot).first().within_m == 300
+    assert client.post(f"{URL}/{spot}/visit", json={}, headers=device).status_code == 422
+    assert client.post(f"{URL}/{spot}/visit", json={"within_m": 50}, headers=device).status_code == 422
+
+
+def test_port_visit_without_location(client, device, port):
+    r = client.post("/api/v1/challenge-ports/visit", json={"key": port.key, "within_m": 500}, headers=device)
+    assert r.status_code == 200, r.text

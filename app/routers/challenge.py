@@ -10,6 +10,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException
@@ -71,8 +72,29 @@ class SeasonOut(BaseModel):
 
 
 class VisitIn(BaseModel):
-    lat: float = Field(ge=-90, le=90)
-    lon: float = Field(ge=-180, le=180)
+    """도장 인증. 앱은 거리를 폰 안에서 재고 `within_m`(100/300/500 안)만 보낸다 — 위치는 서버로 오지 않는다.
+    lat/lon 은 예전 앱 호환용 (받아도 거리 계산에만 쓰고 저장하지 않음)"""
+
+    within_m: Literal[100, 300, 500] | None = None
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lon: float | None = Field(default=None, ge=-180, le=180)
+
+
+def _check_within(body: VisitIn, lat: float, lon: float, radius_m: int, what: str) -> int:
+    """반경 안인지 확인하고 기록할 거리 구간(m)을 돌려준다"""
+    if body.lat is not None and body.lon is not None:
+        km = haversine_km(body.lat, body.lon, lat, lon)
+        if km * 1000 > radius_m:
+            dist = f"{km:.1f}km" if km >= 1 else f"{round(km * 1000)}m"
+            raise HTTPException(
+                status_code=409, detail=f"{what}에서 {dist} 떨어져 있어요. {radius_m}m 안에서 찍을 수 있어요"
+            )
+        return 100 if km <= 0.1 else 300 if km <= 0.3 else 500
+    if body.within_m is None:
+        raise HTTPException(status_code=422, detail="거리 확인 값이 없어요. 앱을 업데이트해 주세요")
+    if body.within_m > radius_m:
+        raise HTTPException(status_code=409, detail=f"{what}에서 {radius_m}m 안에서 찍을 수 있어요")
+    return body.within_m
 
 
 class VisitOut(BaseModel):
@@ -142,12 +164,7 @@ def visit(place_id: int, body: VisitIn, user: CurrentUser, db: DbSession):
     p = db.get(Place, place_id)
     if p is None or p.lat is None or p.lon is None:
         raise HTTPException(status_code=404, detail="장소 위치를 알 수 없어요")
-    km = haversine_km(body.lat, body.lon, p.lat, p.lon)
-    if km * 1000 > s["radius_m"]:
-        dist = f"{km:.1f}km" if km >= 1 else f"{round(km * 1000)}m"
-        raise HTTPException(
-            status_code=409, detail=f"장소에서 {dist} 떨어져 있어요. {s['radius_m']}m 안에서 찍을 수 있어요"
-        )
+    within = _check_within(body, p.lat, p.lon, s["radius_m"], "장소")
     now = utcnow()
     if warning.evaluate(db, p).level == "warning":
         raise HTTPException(
@@ -171,7 +188,7 @@ def visit(place_id: int, body: VisitIn, user: CurrentUser, db: DbSession):
             place_id=place_id,
             season=s["season"],
             visited_at=now,
-            within_m=100 if km <= 0.1 else 300,
+            within_m=within,
         )
     )
     gained = recompute_points(db, user)
@@ -273,12 +290,7 @@ def visit_port(body: PortVisitIn, user: CurrentUser, db: DbSession):
     spot = next((x for x in s["spots"] if x["key"] == body.key), None)
     if spot is None:
         raise HTTPException(status_code=404, detail="탐험 항구가 아니에요")
-    km = haversine_km(body.lat, body.lon, spot["lat"], spot["lon"])
-    if km * 1000 > s["radius_m"]:
-        dist = f"{km:.1f}km" if km >= 1 else f"{round(km * 1000)}m"
-        raise HTTPException(
-            status_code=409, detail=f"항구에서 {dist} 떨어져 있어요. {s['radius_m']}m 안에서 찍을 수 있어요"
-        )
+    within = _check_within(body, spot["lat"], spot["lon"], s["radius_m"], "항구")
     # 배낚시 기준 특보 판정 (먼바다 특보도 막는다)
     as_place = SimpleNamespace(region_name=spot["region"], name=spot["name"], type=PlaceType.BOAT)
     if warning.evaluate(db, as_place).level == "warning":
@@ -300,7 +312,7 @@ def visit_port(body: PortVisitIn, user: CurrentUser, db: DbSession):
             port_key=body.key,
             season=s["season"],
             visited_at=now,
-            within_m=100 if km <= 0.1 else 300 if km <= 0.3 else 500,
+            within_m=within,
         )
     )
     gained = recompute_points(db, user)
