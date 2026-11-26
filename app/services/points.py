@@ -3,6 +3,7 @@
 2026-11-23 바뀜: 사진 인증(관리자 승인) 없이 **활동만으로** 쌓인다 (카페 등급처럼).
 - 낚시 기록: 기록 +10, 어종·크기까지 +5, 처음 간 낚시터 +15, 같은 어종 최대어 갱신 +20
 - 커뮤니티: 글 +5 (하루 3개까지), 댓글 +1 (하루 10개까지) — 도배로 등급을 올리지 못하게
+- 탐험 도장: 장소마다 처음 방문 +20 (2026-11-26)
 
 활동이 바뀔 때마다 「있어야 할 포인트 이벤트」를 다시 계산하고 원장 잔액과의 차이만 append-only 로 기록한다.
 - 같은 기록을 여러 번 저장해도 차이가 0 이라 중복 지급 없음 (키 = 사유 + 대상 ID)
@@ -16,7 +17,7 @@ from datetime import timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import AppUser, Comment, Journal, PointLedger, Post
+from app.models import AppUser, ChallengeVisit, Comment, Journal, PointLedger, Post
 from app.models.enums import PointReason
 
 # 「사진 첨부 +5」(PHOTO_ATTACHED)는 폐지 — 사진은 인증 조건이므로 중복.
@@ -28,6 +29,7 @@ POINTS: dict[PointReason, int] = {
     PointReason.PERSONAL_BEST: 20,
     PointReason.POST_CREATED: 5,
     PointReason.COMMENT_CREATED: 1,
+    PointReason.CHALLENGE_VISIT: 20,
 }
 DAILY_CAP: dict[PointReason, int] = {PointReason.POST_CREATED: 3, PointReason.COMMENT_CREATED: 10}
 KST = timedelta(hours=9)
@@ -113,6 +115,13 @@ def recompute_points(db: Session, user: AppUser) -> int:
     ).all()
     expected.update(capped_events(PointReason.POST_CREATED, [tuple(r) for r in posts]))
     expected.update(capped_events(PointReason.COMMENT_CREATED, [tuple(r) for r in comments]))
+    # 탐험 도장: 장소마다 처음 방문 한 번 (2026-11-26)
+    for (place_id,) in db.execute(
+        select(ChallengeVisit.place_id).where(ChallengeVisit.user_id == user.id).distinct()
+    ).all():
+        expected[(PointReason.CHALLENGE_VISIT, f"challenge:{place_id}")] = ExpectedEvent(
+            POINTS[PointReason.CHALLENGE_VISIT], None
+        )
 
     current: dict[EventKey, int] = defaultdict(int)
     for reason, ref_key, total in db.execute(

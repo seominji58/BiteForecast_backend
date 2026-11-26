@@ -1,4 +1,5 @@
 from app.models.base import Base
+from app.models.challenge import ChallengeVisit
 from app.models.community import Comment, ContentReport, Post, PostLike, UserBlock
 from app.models.coord import PlaceCoordCheck
 from app.models.fishing import FishingIndex, MarineWarningSnapshot
@@ -14,6 +15,7 @@ from app.models.user import Account, AccountIdentity, AppUser, AuthSession, Favo
 
 __all__ = [
     "Base",
+    "ChallengeVisit",
     "Account",
     "AccountIdentity",
     "AppUser",

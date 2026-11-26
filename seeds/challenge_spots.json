@@ -1,0 +1,135 @@
+{
+ "_note": "탐험 시즌 1 — 공식 바다낚시공원·해상낚시터 (2026-11-26). place_id 는 운영 DB 낚시터 id. 운영 정보(info)는 누리집 확인 결과로 채운다",
+ "season": 1,
+ "title": "시즌 1 · 바다낚시공원",
+ "radius_m": 300,
+ "points": 20,
+ "spots": [
+  {
+   "place_id": 243,
+   "name": "선재낚시공원",
+   "region": "인천 옹진군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 244,
+   "name": "영흥바다낚시터",
+   "region": "인천 옹진군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 245,
+   "name": "용담바다낚시터",
+   "region": "인천 옹진군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 237,
+   "name": "선두바다낚시터",
+   "region": "인천 강화군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 238,
+   "name": "강화도 황청낚시터",
+   "region": "인천 강화군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 240,
+   "name": "황산초지바다낚시터",
+   "region": "인천 강화군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 242,
+   "name": "소래바다낚시터",
+   "region": "인천 남동구",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 212,
+   "name": "갈음이 해상낚시공원",
+   "region": "충남 태안군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 249,
+   "name": "안면도 라암도 해상낚시공원",
+   "region": "충남 태안군",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 175,
+   "name": "원산도 선촌 해양낚시터",
+   "region": "충남 보령시",
+   "sea": "서해",
+   "info": null
+  },
+  {
+   "place_id": 235,
+   "name": "지세포 낚시공원",
+   "region": "경남 거제시",
+   "sea": "남해",
+   "info": null
+  },
+  {
+   "place_id": 91,
+   "name": "통영등대낚시공원",
+   "region": "경남 통영시",
+   "sea": "남해",
+   "info": null
+  },
+  {
+   "place_id": 133,
+   "name": "돌산해양낚시공원낚시터",
+   "region": "전남 여수시",
+   "sea": "남해",
+   "info": null
+  },
+  {
+   "place_id": 117,
+   "name": "거금해양낚시공원",
+   "region": "전남 고흥군",
+   "sea": "남해",
+   "info": null
+  },
+  {
+   "place_id": 247,
+   "name": "득량만바다낚시공원",
+   "region": "전남 보성군",
+   "sea": "남해",
+   "info": null
+  },
+  {
+   "place_id": 138,
+   "name": "정남진 해양낚시공원",
+   "region": "전남 장흥군",
+   "sea": "남해",
+   "info": null
+  },
+  {
+   "place_id": 116,
+   "name": "가우도 복합낚시공원",
+   "region": "전남 강진군",
+   "sea": "남해",
+   "info": null
+  },
+  {
+   "place_id": 110,
+   "name": "당사해양낚시공원",
+   "region": "울산 북구",
+   "sea": "동해",
+   "info": null
+  }
+ ]
+}

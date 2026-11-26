@@ -60,6 +60,7 @@ class PointReason(StrEnum):
     PERSONAL_BEST = "PERSONAL_BEST"  # +20
     POST_CREATED = "POST_CREATED"  # +5 (하루 3개까지, 2026-11-23 활동 포인트)
     COMMENT_CREATED = "COMMENT_CREATED"  # +1 (하루 10개까지)
+    CHALLENGE_VISIT = "CHALLENGE_VISIT"  # +20 (탐험 도장, 장소마다 처음 한 번, 2026-11-26)
 
 
 class RestrictionType(StrEnum):
