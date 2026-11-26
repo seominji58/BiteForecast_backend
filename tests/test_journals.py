@@ -48,7 +48,8 @@ def test_validation(client, device, places):
 
     assert post(count=-1).status_code == 422  # 마릿수 음수 금지
     assert post(max_length_cm=0).status_code == 422
-    assert post(max_length_cm=301).status_code == 422
+    assert post(max_length_cm=601).status_code == 422
+    assert post(max_length_cm=450).status_code == 201  # 참치·상어 (2026-11-26)
     future = (datetime.now(UTC) + timedelta(days=1)).isoformat()
     assert post(when=future).status_code == 422
     assert post(when="2026-11-01T06:00:00").status_code == 422  # timezone 없음

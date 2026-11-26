@@ -18,7 +18,7 @@ class AuthorOut(BaseModel):
 
 class PostIn(BaseModel):
     category: PostCategory
-    title: str = Field(min_length=2, max_length=60)
+    title: str = Field(min_length=1, max_length=60)  # 이모티콘 하나짜리 제목도 허용 (2026-11-26)
     body: str = Field(min_length=1, max_length=2000)
     place_id: int | None = None
     # 낚시터 없이 지역만 고를 때 (GET /regions 의 id). 낚시터를 고르면 무시하고 그 낚시터의 지역을 쓴다
@@ -148,7 +148,7 @@ class PostEdit(BaseModel):
     """내 글 고치기. 보낸 칸만 바꾼다. 기록을 공유한 글은 분류·장소·어종을 바꿀 수 없다(기록 것을 씀)"""
 
     category: PostCategory | None = None
-    title: str | None = Field(default=None, min_length=2, max_length=60)
+    title: str | None = Field(default=None, min_length=1, max_length=60)
     body: str | None = Field(default=None, min_length=1, max_length=2000)
     place_id: int | None = None
     region_id: int | None = None

@@ -20,7 +20,8 @@ class JournalIn(BaseModel):
     species_code: str | None = Field(default=None, max_length=30)
     species_etc: str | None = Field(default=None, max_length=50)
     count: int | None = Field(default=None, ge=0, le=999)
-    max_length_cm: float | None = Field(default=None, gt=0, le=300)
+    # 참치·상어 등 300cm 넘는 어종도 있어 600cm 까지 (2026-11-26 친구 테스트)
+    max_length_cm: float | None = Field(default=None, gt=0, le=600)
     bait: str | None = Field(default=None, max_length=50)
     rig: str | None = Field(default=None, max_length=50)
     memo: str | None = Field(default=None, max_length=1000)
@@ -54,7 +55,7 @@ class JournalIn(BaseModel):
     @model_validator(mode="after")
     def _one_species_field(self):
         if self.species_code and self.species_etc:
-            raise ValueError("어종은 목록 선택(species_code)과 직접 입력(species_etc) 중 하나만 입력합니다")
+            raise ValueError("어종은 목록에서 고르거나 직접 입력하거나, 하나만 해 주세요")
         return self
 
 
