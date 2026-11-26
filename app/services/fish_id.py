@@ -181,6 +181,8 @@ def identify(jpeg: bytes, species: list[tuple[str, str]], http: httpx.Client | N
         ],
         "text": {"format": {"type": "json_schema", "name": "fish_id", "schema": SCHEMA, "strict": True}},
         "max_output_tokens": 600,
+        # 응답을 OpenAI 쪽에 저장하지 않는다 (기본값은 저장)
+        "store": False,
     }
     if s.openai_model.startswith(("gpt-5", "o")):
         # 추론 모델: 생각에 쓰는 토큰도 출력 한도에 들어간다 → 짧게 생각하고 한도를 넉넉히
